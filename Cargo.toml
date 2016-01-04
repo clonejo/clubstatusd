@@ -1,0 +1,10 @@
+[package]
+name = "clubstatusd"
+version = "0.1.0"
+authors = ["clonejo <clonejo@shakik.de>"]
+
+[dependencies]
+hyper = "0.6"
+rusqlite = "0.4.0"
+chrono = "0.2"
+libc = "0.2"
