@@ -98,7 +98,8 @@ The server will add a human readable note explaining the changes
 
 ## Queries
 By default, all actions are encoded (and expected to be encoded) in JSON. Other
-encodings might be allowed in future.  
+encodings might be added in future. Whenever a list is returned, it is wrapped
+in `{"actions": […]}`.  
 Authenticate using HTTP Authentication, unless you use the public API. The
 username is ignored.  
 If you want to show relative times in your interface, use the server's time
