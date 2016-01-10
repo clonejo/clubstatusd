@@ -148,22 +148,27 @@ impl Action for PresenceAction {
     fn get_base_action<'a>(&'a self) -> &'a BaseAction { &self.action }
 }
 
-pub fn json_to_object(json: Json) -> Box<Action> {
+pub fn json_to_object(json: Json) -> Result<Box<Action>, String> {
     let obj = json.as_object().unwrap();
     let note = match obj.get("note") {
         Some(j) => String::from(j.as_string().unwrap()),
         None => "".into()
     };
     let base_action = BaseAction::new(note);
-    Box::new(match obj.get("type").unwrap().as_string().unwrap() {
+    match obj.get("type").unwrap().as_string().unwrap() {
         "status" => {
-            StatusAction {
-                action: base_action,
-                user: String::from(obj.get("user").unwrap().as_string().unwrap()),
-                status: Status::from_str(obj.get("status").unwrap().as_string().unwrap()).unwrap()
+            let user = obj.get("user").unwrap().as_string().unwrap().trim();
+            if user.len() == 0 || user.len() > 15 {
+                return Err("Bad username, unicode chars, 1 to 15 bytes\n".into());
             }
+            Ok(Box::new(StatusAction {
+                action: base_action,
+                user: String::from(user),
+                status: Status::from_str(obj.get("status").unwrap().as_string().unwrap()).unwrap()
+            }))
         },
-        _ => panic!()
-    })
+        _ =>
+            Err("Unknown action type\n".into())
+    }
 }
 

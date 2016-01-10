@@ -39,8 +39,8 @@ The examples below omit the standard members.
 
 ```js
 {
-    "user": "Hans Acker", // the user who changed the status (1 to 15 unicode
-                          // chars, enclosing whitespace is stripped)
+    "user": "Hans Acker", // the user who changed the status (unicode chars,
+                          // 1 to 15 bytes, enclosing whitespace is stripped)
     "status": "closed"    // What the status has been changed to.
                           // Possible values: "public", "private", "closed"
 }
@@ -54,8 +54,8 @@ The examples below omit the standard members.
     "method": "new",      // "new" | "mod" | "del"
     "aid": 42,            // the announcement to operate on. only needed when
                           // "action=mod" or "action=del"
-    "user": "Hans Acker", // the user who announces to come (1 to 15 unicode
-                          // chars, enclosing whitespace is stripped)
+    "user": "Hans Acker", // the user who announces to come (unicode chars
+                          // 1 to 15 bytes, enclosing whitespace is stripped)
     "from": 123456789,    // UNIX timestamp
     "to": 123456789,      // UNIX timestamp
     "public": true        // if the announcement can be seen without
@@ -69,7 +69,7 @@ The examples below omit the standard members.
 #### Client request:
 ```js
 {
-    "user": "Hans Acker", // 15 unicode chars, enclosing whitespace is stripped
+    "user": "Hans Acker", // unicode chars, 1 to 15 bytes, enclosing whitespace is stripped
     "api_key": "abc123"   // an authentication key given to you by the status
                           // admin
 }

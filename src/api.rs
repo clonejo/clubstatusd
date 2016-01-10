@@ -1,4 +1,5 @@
 
+use std::str;
 use iron::{Iron, Request, Response, IronResult};
 use iron::status;
 use router::Router;
@@ -28,18 +29,38 @@ fn api_versions(_req: &mut Request) -> IronResult<Response> {
     Ok(Response::with((status::Ok, obj.to_json().to_string())))
 }
 
+/*
+ * PUT
+ */
 fn create_action(req: &mut Request, shared_con: Arc<Mutex<DbCon>>) -> IronResult<Response> {
-    let mut action_string = String::new();
-    req.body.read_to_string(&mut action_string).unwrap();
-    let action_json = Json::from_str(&action_string).unwrap();
-    let mut action = json_to_object(action_json);
-    let con = shared_con.lock().unwrap();
-    action.store(&*con);
-    let mut resp_str = format!("{}", action.get_base_action().id.unwrap());
-    resp_str.push('\n');
-    Ok(Response::with((status::Ok, resp_str)))
+    let mut action_buf = &mut [0; 1024];
+    // parse at maximum 1k bytes
+    let bytes_read = req.body.read(action_buf).unwrap();
+    let (mut action_buf, _) = action_buf.split_at(bytes_read);
+    let action_str = str::from_utf8(action_buf).unwrap();
+    match Json::from_str(action_str) {
+        Err(_) =>
+            Ok(Response::with((status::BadRequest, "Bad JSON\n"))),
+        Ok(action_json) => {
+            match json_to_object(action_json) {
+                Ok(mut action) => {
+                    let con = shared_con.lock().unwrap();
+                    action.store(&*con);
+                    let mut resp_str = format!("{}", action.get_base_action().id.unwrap());
+                    resp_str.push('\n');
+                    Ok(Response::with((status::Ok, resp_str)))
+                },
+                Err(msg) => {
+                    Ok(Response::with((status::BadRequest, msg)))
+                }
+            }
+        }
+    }
 }
 
+/*
+ * GET
+ */
 fn status_current(_req: &mut Request, shared_con: Arc<Mutex<DbCon>>) -> IronResult<Response> {
     let mut obj = Object::new();
     let con = shared_con.lock().unwrap();
