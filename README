@@ -5,4 +5,4 @@ Implements a status API for hackerspaces. Most actions require authentication (H
 # Build
 Build dependencies: Rust and Cargo
 
-To build, run `cargo build`
+To build, run `cargo build --release`
