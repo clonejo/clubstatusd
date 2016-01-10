@@ -37,11 +37,13 @@ fn create_tables(con: &SqliteConnection) {
  *   0: closed
  *   1: private
  *   2: public
+ * changed: boolean
  */
 con.execute("CREATE TABLE status_action (
                  id INTEGER PRIMARY KEY,
                  user TEXT NOT NULL,
-                 status INTEGER NOT NULL
+                 status INTEGER NOT NULL,
+                 changed INTEGER NOT NULL
              )", &[]).unwrap();
 
 /*
@@ -70,6 +72,10 @@ con.execute("CREATE TABLE presence_action (
 
 fn insert_initial_status(con: &SqliteConnection) {
     let mut status_action = StatusAction::new("initial state".into(), "Hans Acker".into(), Status::Closed);
+    status_action.store(con).unwrap();
+    let mut status_action = StatusAction::new("".into(), "Hans Acker".into(), Status::Closed);
+    status_action.store(con).unwrap();
+    let mut status_action = StatusAction::new("".into(), "Hans Acker".into(), Status::Closed);
     status_action.store(con).unwrap();
 }
 
