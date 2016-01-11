@@ -151,7 +151,13 @@ impl Action for PresenceAction {
 pub fn json_to_object(json: Json) -> Result<Box<Action>, String> {
     let obj = json.as_object().unwrap();
     let note = match obj.get("note") {
-        Some(j) => String::from(j.as_string().unwrap()),
+        Some(j) => {
+            let note =j.as_string().unwrap();
+            if note.len() > 80 {
+                return Err("Bad note, unicode chars, maximum 80 bytes\n".into());
+            }
+            String::from(note)
+        }
         None => "".into()
     };
     let base_action = BaseAction::new(note);

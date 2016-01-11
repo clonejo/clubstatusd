@@ -21,7 +21,7 @@ All actions share these members:
     "id": 123,            // unique identifier, always increasing
     "time": 1234567890,   // UNIX timestamp, in seconds
     "type": "status",     // the action type
-    "note": "some string" // not interpreted, maximum length of 80 characters
+    "note": "some string" // not interpreted, maximum length of 80 bytes (UTF-8)
 }
 ```
 
@@ -39,7 +39,7 @@ The examples below omit the standard members.
 
 ```js
 {
-    "user": "Hans Acker", // the user who changed the status (unicode chars,
+    "user": "Hans Acker", // the user who changed the status (UTF-8,
                           // 1 to 15 bytes, enclosing whitespace is stripped)
     "status": "closed"    // What the status has been changed to.
                           // Possible values: "public", "private", "closed"
@@ -54,7 +54,7 @@ The examples below omit the standard members.
     "method": "new",      // "new" | "mod" | "del"
     "aid": 42,            // the announcement to operate on. only needed when
                           // "action=mod" or "action=del"
-    "user": "Hans Acker", // the user who announces to come (unicode chars
+    "user": "Hans Acker", // the user who announces to come (UTF-8,
                           // 1 to 15 bytes, enclosing whitespace is stripped)
     "from": 123456789,    // UNIX timestamp
     "to": 123456789,      // UNIX timestamp
@@ -69,7 +69,7 @@ The examples below omit the standard members.
 #### Client request:
 ```js
 {
-    "user": "Hans Acker", // unicode chars, 1 to 15 bytes, enclosing whitespace is stripped
+    "user": "Hans Acker", // UTF-8, 1 to 15 bytes, enclosing whitespace is stripped
     "api_key": "abc123"   // an authentication key given to you by the status
                           // admin
 }
