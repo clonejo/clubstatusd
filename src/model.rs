@@ -101,6 +101,30 @@ pub enum AnnouncementMethod {
     Del
 }
 
+impl ToJson for AnnouncementMethod {
+    fn to_json(&self) -> Json {
+        Json::String(match self {
+            &AnnouncementMethod::New => "new",
+            &AnnouncementMethod::Mod => "mod",
+            &AnnouncementMethod::Del => "del"
+        }.into())
+    }
+}
+
+impl ToJson for AnnouncementAction {
+    fn to_json(&self) -> Json {
+        let mut obj = self.action.to_json_obj();
+        obj.insert("type".into(), "announcement".to_json());
+        obj.insert("method".into(), self.method.to_json());
+        obj.insert("aid".into(), self.aid.to_json());
+        obj.insert("user".into(), self.user.to_json());
+        obj.insert("from".into(), self.from.to_json());
+        obj.insert("to".into(), self.to.to_json());
+        obj.insert("public".into(), self.public.to_json());
+        Json::Object(obj)
+    }
+}
+
 #[derive(Debug)]
 pub struct PresenceAction {
     pub action: BaseAction,
@@ -135,7 +159,24 @@ impl PresentUser {
     }
 }
 
-pub trait Action: DbStored {
+impl ToJson for PresentUser {
+    fn to_json(&self) -> Json {
+        let mut obj = Object::new();
+        obj.insert("name".into(), self.name.to_json());
+        obj.insert("since".into(), self.since.to_json());
+        Json::Object(obj)
+    }
+}
+impl ToJson for PresenceAction {
+    fn to_json(&self) -> Json {
+        let mut obj = self.action.to_json_obj();
+        obj.insert("type".into(), "presence".to_json());
+        obj.insert("users".into(), self.users.to_json());
+        Json::Object(obj)
+    }
+}
+
+pub trait Action: DbStored + ToJson {
     fn get_base_action<'a>(&'a self) -> &'a BaseAction;
 }
 impl Action for StatusAction {
@@ -147,6 +188,13 @@ impl Action for AnnouncementAction {
 impl Action for PresenceAction {
     fn get_base_action<'a>(&'a self) -> &'a BaseAction { &self.action }
 }
+
+impl ToJson for Box<Action> {
+    fn to_json(&self) -> Json {
+        (**self).to_json()
+    }
+}
+
 
 pub fn json_to_object(json: Json) -> Result<Box<Action>, String> {
     let obj = json.as_object().unwrap();

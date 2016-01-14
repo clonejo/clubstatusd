@@ -96,6 +96,13 @@ pub mod status {
         }
     }
 
+    pub fn get_by_id(id: u64, con: &DbCon) -> SqliteResult<StatusAction> {
+        con.query_row("SELECT * FROM action JOIN status_action WHERE \
+                       action.id = ? AND status_action.id = ?",
+                      &[&(id as i64), &(id as i64)],
+                      row_to_status_action)
+    }
+
     pub fn get_last(con: &DbCon) -> SqliteResult<StatusAction> {
         con.query_row("SELECT * FROM action JOIN status_action WHERE action.type = 0 AND \
                        action.id = status_action.id \
@@ -206,32 +213,41 @@ impl ToSql for AnnouncementMethod {
 pub mod announcements {
     use super::*;
     use super::super::model::*;
-    use rusqlite::{SqliteResult, SqliteError};
+    use rusqlite::{SqliteResult, SqliteError, SqliteRow};
+
+    fn row_to_announcement_action(row: SqliteRow) -> AnnouncementAction {
+        AnnouncementAction{
+            action: BaseAction {
+                id: Some(row.get::<i64>(0) as u64),
+                time: row.get(1),
+                note: row.get(3)
+            },
+            method: row.get(5),
+            aid: Some(row.get::<i64>(6) as u64),
+            user: row.get(7),
+            from: row.get(8),
+            to: row.get(9),
+            public: match row.get(10) {
+                0 => false,
+                1 => true,
+                _ => panic!()
+            }
+        }
+    }
+
+    pub fn get_by_id(id: u64, con: &DbCon) -> SqliteResult<AnnouncementAction> {
+        con.query_row("SELECT * FROM action JOIN status_action WHERE \
+                       action.id = ? AND status_action.id = ?",
+                      &[&(id as i64), &(id as i64)],
+                      row_to_announcement_action)
+    }
 
     pub fn get_last(aid: u64, con: &DbCon) -> SqliteResult<Option<AnnouncementAction>> {
         let res = con.query_row("SELECT * FROM action JOIN announcement_action WHERE action.type = 1 AND \
                                  action.id = announcement_action.id AND announcement_action.aid = ? \
                                  ORDER BY action.id DESC LIMIT 1",
                                 &[&(aid as i64)],
-                                |row| {
-                                    AnnouncementAction{
-                                        action: BaseAction {
-                                            id: Some(row.get::<i64>(0) as u64),
-                                                time: row.get(1),
-                                            note: row.get(3)
-                                        },
-                                        method: row.get(5),
-                                        aid: Some(row.get::<i64>(6) as u64),
-                                        user: row.get(7),
-                                        from: row.get(8),
-                                        to: row.get(9),
-                                        public: match row.get(10) {
-                                            0 => false,
-                                            1 => true,
-                                            _ => panic!()
-                                        }
-                                    }
-                                });
+                                row_to_announcement_action);
         match res {
             Ok(announcement_action) => Ok(Some(announcement_action)),
             Err(SqliteError{code: 27, message: _}) => Ok(None),
@@ -270,35 +286,70 @@ impl DbStored for PresenceAction {
 pub mod presence {
     use super::*;
     use super::super::model::*;
-    use rusqlite::{SqliteResult};
+    use rusqlite::{SqliteResult, SqliteRow};
 
-    pub fn get_last(con: &DbCon) -> SqliteResult<PresenceAction> {
-        let action_res = con.query_row("SELECT * FROM action WHERE type = 2 ORDER BY id DESC LIMIT 1",
-                                       &[],
-                                       |row| {
-                                           BaseAction {
-                                               id: Some(row.get::<i64>(0) as u64),
-                                               time: row.get(1),
-                                               note: row.get(3)
-                                           }
-                                       });
+    fn row_to_base_action(row: SqliteRow) -> BaseAction {
+        BaseAction {
+            id: Some(row.get::<i64>(0) as u64),
+            time: row.get(1),
+            note: row.get(3)
+        }
+    }
+
+    fn get_by_base_action(action: BaseAction, con: &DbCon) -> SqliteResult<PresenceAction> {
+        let mut stmt = con.prepare("SELECT user, since FROM presence_action WHERE id = ?").unwrap();
+        let users_iter = stmt.query_map(&[&(action.id.unwrap() as i64)], |row| {
+            PresentUser{name: row.get(0), since: row.get(1)}
+        }).unwrap();
+        let users = users_iter.map(|user| { user.unwrap() }).collect();
+        Ok(
+            PresenceAction{
+                action: action,
+                users: users
+            }
+          )
+    }
+
+    pub fn get_by_id(id: u64, con: &DbCon) -> SqliteResult<PresenceAction> {
+        let action_res = con.query_row("SELECT * FROM action WHERE id = ? AND type = 2",
+                                       &[&(id as i64)],
+                                       row_to_base_action);
         match action_res {
             Ok(action) => {
-                let mut stmt = con.prepare("SELECT user, since FROM presence_action WHERE id = ?").unwrap();
-                let users_iter = stmt.query_map(&[&(action.id.unwrap() as i64)], |row| {
-                    PresentUser{name: row.get(0), since: row.get(1)}
-                }).unwrap();
-                let users = users_iter.map(|user| { user.unwrap() }).collect();
-                Ok(
-                    PresenceAction{
-                        action: action,
-                        users: users
-                    }
-                  )
+                get_by_base_action(action, con)
             },
             Err(e) =>
                 Err(e)
         }
     }
+
+    pub fn get_last(con: &DbCon) -> SqliteResult<PresenceAction> {
+        let action_res = con.query_row("SELECT * FROM action WHERE type = 2 ORDER BY id DESC LIMIT 1",
+                                       &[],
+                                       row_to_base_action);
+        match action_res {
+            Ok(action) => {
+                get_by_base_action(action, con)
+            },
+            Err(e) =>
+                Err(e)
+        }
+    }
+}
+
+pub fn query(con: &DbCon) -> SqliteResult<Vec<Box<Action>>> {
+    let transaction = con.transaction().unwrap();
+    let mut stmt = con.prepare("SELECT id, type FROM action").unwrap();
+    let actions_iter = stmt.query_map(&[], |row| -> Box<Action> {
+        match row.get(1) {
+            0 => Box::new(status::get_by_id(row.get::<i64>(0) as u64, con).unwrap()) as Box<Action>,
+            1 => Box::new(announcements::get_by_id(row.get::<i64>(0) as u64, con).unwrap()) as Box<Action>,
+            2 => Box::new(presence::get_by_id(row.get::<i64>(0) as u64, con).unwrap()) as Box<Action>,
+            id => panic!("unknown action type in db: {}", id)
+        }
+    }).unwrap();
+    let actions = actions_iter.map(|action| { action.unwrap() }).collect();
+    transaction.commit().unwrap();
+    Ok(actions)
 }
 
