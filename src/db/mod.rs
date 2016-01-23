@@ -337,10 +337,10 @@ pub mod presence {
     }
 }
 
-pub fn query(con: &DbCon) -> SqliteResult<Vec<Box<Action>>> {
+pub fn query(count: u64, con: &DbCon) -> SqliteResult<Vec<Box<Action>>> {
     let transaction = con.transaction().unwrap();
-    let mut stmt = con.prepare("SELECT id, type FROM action").unwrap();
-    let actions_iter = stmt.query_map(&[], |row| -> Box<Action> {
+    let mut stmt = con.prepare("SELECT id, type FROM action ORDER BY id DESC LIMIT ?").unwrap();
+    let actions_iter = stmt.query_map(&[&(count as i64)], |row| -> Box<Action> {
         match row.get(1) {
             0 => Box::new(status::get_by_id(row.get::<i64>(0) as u64, con).unwrap()) as Box<Action>,
             1 => Box::new(announcements::get_by_id(row.get::<i64>(0) as u64, con).unwrap()) as Box<Action>,
@@ -348,7 +348,8 @@ pub fn query(con: &DbCon) -> SqliteResult<Vec<Box<Action>>> {
             id => panic!("unknown action type in db: {}", id)
         }
     }).unwrap();
-    let actions = actions_iter.map(|action| { action.unwrap() }).collect();
+    let mut actions: Vec<Box<Action>> = actions_iter.map(|action| { action.unwrap() }).collect();
+    actions.reverse();
     transaction.commit().unwrap();
     Ok(actions)
 }
