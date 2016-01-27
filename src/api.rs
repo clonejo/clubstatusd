@@ -218,8 +218,14 @@ fn status_current(pr: ParsedRequest, mut res: Response, shared_con: Arc<Mutex<Db
         obj.insert("last".into(), db::status::get_last(&*con).unwrap().to_json());
     }
 
-    let mut changed_action = db::status::get_last_changed(&*con).unwrap().to_json();
-    public_api_strip(&mut changed_action);
+    let mut changed_action = if public_api {
+        db::status::get_last_changed_public(&*con).unwrap().to_json()
+    } else {
+        db::status::get_last_changed(&*con).unwrap().to_json()
+    };
+    if public_api {
+        public_api_strip(&mut changed_action);
+    }
     obj.insert("changed".into(), changed_action);
 
     {

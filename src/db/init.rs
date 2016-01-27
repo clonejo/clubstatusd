@@ -43,7 +43,8 @@ con.execute("CREATE TABLE status_action (
                  id INTEGER PRIMARY KEY,
                  user TEXT NOT NULL,
                  status INTEGER NOT NULL,
-                 changed INTEGER NOT NULL
+                 changed INTEGER NOT NULL,
+                 public_changed INTEGER NOT NULL
              )", &[]).unwrap();
 
 /*

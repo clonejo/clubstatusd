@@ -39,13 +39,26 @@ impl DbStored for StatusAction {
         match self.action.id {
             None => {
                 let transaction = con.transaction().unwrap();
-                let changed = match status::get_last(con) {
-                    Ok(current_status) => current_status.status != self.status,
-                    Err(_) => true
+                let (changed, public_changed) = match status::get_last(con) {
+                    Ok(current_status) => {
+                        let curr_status_pub = match current_status.status {
+                            Status::Public => Status::Public,
+                            _ => Status::Closed
+                        };
+                        let new_status_pub = match self.status {
+                            Status::Public => Status::Public,
+                            _ => Status::Closed
+                        };
+                        (current_status.status != self.status,
+                         curr_status_pub != new_status_pub)
+                    },
+                    Err(_) => (true, true)
                 };
                 let action_id = self.action.store(con).unwrap();
-                con.execute("INSERT INTO status_action (id, user, status, changed) VALUES (?, ?, ?, ?)",
-                            &[&(action_id as i64), &self.user, &self.status, &(changed as i64)]).unwrap();
+                con.execute("INSERT INTO status_action (id, user, status, changed, public_changed) \
+                             VALUES (?, ?, ?, ?, ?)",
+                            &[&(action_id as i64), &self.user, &self.status,
+                              &(changed as i64), &(public_changed as i64)]).unwrap();
                 self.action.id = Some(action_id);
                 transaction.commit().unwrap();
                 Some(action_id)
@@ -114,6 +127,14 @@ pub mod status {
     pub fn get_last_changed(con: &DbCon) -> SqliteResult<StatusAction> {
         con.query_row("SELECT * FROM action JOIN status_action WHERE action.type = 0 AND \
                        action.id = status_action.id AND status_action.changed = 1 \
+                       ORDER BY action.id DESC LIMIT 1",
+                      &[],
+                      row_to_status_action)
+    }
+
+    pub fn get_last_changed_public(con: &DbCon) -> SqliteResult<StatusAction> {
+        con.query_row("SELECT * FROM action JOIN status_action WHERE action.type = 0 AND \
+                       action.id = status_action.id AND status_action.public_changed = 1 \
                        ORDER BY action.id DESC LIMIT 1",
                       &[],
                       row_to_status_action)
