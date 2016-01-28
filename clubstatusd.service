@@ -3,7 +3,7 @@
 Description=HTTP API for managing your hackerspace's status
 
 [Service]
-ExecStart=/usr/bin/clubstatusd
+ExecStart=/usr/local/bin/clubstatusd
 Restart=on-failure
 
 [Install]
