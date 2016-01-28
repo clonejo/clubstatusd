@@ -1,0 +1,11 @@
+
+[Unit]
+Description=HTTP API for managing your hackerspace's status
+
+[Service]
+ExecStart=/usr/bin/clubstatusd
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target
+
