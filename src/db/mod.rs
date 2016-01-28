@@ -11,10 +11,10 @@ pub use db::init::ensure_initialized;
 
 pub type DbCon = SqliteConnection;
 
-pub fn connect(path_str: &str) -> DbCon {
+pub fn connect(path_str: &str) -> Result<DbCon, SqliteError> {
     let path = Path::new(path_str);
     ensure_initialized(path);
-    SqliteConnection::open(path).unwrap()
+    SqliteConnection::open(path)
 }
 
 pub trait DbStored {

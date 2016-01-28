@@ -45,14 +45,23 @@ fn main() {
         }
     };
 
-    let con = db::connect("db.sqlite");
-    let password = match conf.lookup_str("password") {
-        Some(s) => Some(s),
-        None => {
+    let db_path_str = conf.lookup_str_or("database_path", "/var/local/clubstatusd/db.sqlite");
+    match db::connect(db_path_str) {
+        Ok(con) => {
+            let password = match conf.lookup_str("password") {
+                Some(s) => Some(s),
+                None => {
+                    writeln!(&mut stderr(),
+                             "No password set, the whole API will be available unauthenticated.").unwrap();
+                    None
+                }
+            };
+            api::run(con, conf.lookup_str_or("listen", "localhost:8000"), password);
+        },
+        Err(err) => {
             writeln!(&mut stderr(),
-                     "No password set, the whole API will be available unauthenticated.").unwrap();
-            None
+                     "Could not open database (path: {}), error message:\n{:?}", db_path_str, err).unwrap();
+            std::process::exit(1);
         }
-    };
-    api::run(con, conf.lookup_str_or("listen", "localhost:8000"), password);
+    }
 }

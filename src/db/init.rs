@@ -1,21 +1,20 @@
 use std::path::Path;
-use rusqlite::SqliteConnection;
+use rusqlite::{SqliteConnection, SqliteError};
 use std::fs;
 use model::*;
 use db::DbStored;
 
-pub fn ensure_initialized(path: &Path) -> SqliteConnection {
+pub fn ensure_initialized(path: &Path) -> Result<(), SqliteError> {
     match fs::metadata(path) {
         Err(_) => {
-            let con = SqliteConnection::open(path).unwrap();
+            let con = try!(SqliteConnection::open(path));
             create_tables(&con);
             insert_initial_status(&con);
             insert_initial_presence(&con);
-            con
         }
-        Ok(_) =>
-            SqliteConnection::open(path).unwrap()
+        Ok(_) => {}
     }
+    Ok(())
 }
 
 fn create_tables(con: &SqliteConnection) {
