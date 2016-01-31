@@ -12,9 +12,13 @@ pub struct BaseAction {
 
 impl BaseAction {
     fn new(note: String) -> BaseAction {
+        Self::new_with_time(note, UTC::now().timestamp())
+    }
+
+    fn new_with_time(note: String, time: i64) -> BaseAction {
         BaseAction {
             id: None,
-            time: UTC::now().timestamp(),
+            time: time,
             note: note
         }
     }
@@ -71,6 +75,15 @@ impl StatusAction {
             status: status
         }
     }
+
+    pub fn new_with_time(note: String, time: i64, user: String, status: Status) -> Self {
+        StatusAction {
+            action: BaseAction::new_with_time(note, time),
+            user: user,
+            status: status
+        }
+    }
+
 }
 
 impl ToJson for StatusAction {
@@ -133,12 +146,12 @@ pub struct PresenceAction {
 
 impl PresenceAction {
     pub fn new(note: String, users: Vec<PresentUser>) -> Self {
+        Self::new_with_time(note, UTC::now().timestamp(), users)
+    }
+
+    pub fn new_with_time(note: String, time: i64, users: Vec<PresentUser>) -> Self {
         PresenceAction {
-            action: BaseAction {
-                id: Option::None,
-                time: UTC::now().timestamp(),
-                note: note
-            },
+            action: BaseAction::new_with_time(note, time),
             users: users
         }
     }

@@ -257,8 +257,8 @@ pub mod announcements {
     }
 
     pub fn get_by_id(id: u64, con: &DbCon) -> SqliteResult<AnnouncementAction> {
-        con.query_row("SELECT * FROM action JOIN status_action WHERE \
-                       action.id = ? AND status_action.id = ?",
+        con.query_row("SELECT * FROM action JOIN announcement_action WHERE action.type = 1 AND \
+                        action.id = ? AND announcement_action.id = ?",
                       &[&(id as i64), &(id as i64)],
                       row_to_announcement_action)
     }
