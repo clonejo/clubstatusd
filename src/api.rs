@@ -46,6 +46,7 @@ pub fn run(con: DbCon, listen: &str, password: Option<&str>) {
     router.add("/api/v0", (Method::Put, Box::new(create_action)));
     router.add("/api/v0/:type", (Method::Get, Box::new(query)));
     router.add("/api/v0/status/current", (Method::Get, Box::new(status_current)));
+    router.add("/api/v0/announcement/current", (Method::Get, Box::new(announcement_current)));
 
     Server::http(listen).unwrap().handle(move |req: Request, res: Response| {
         let (match_result, get_params_string) = {
@@ -240,6 +241,25 @@ fn status_current(pr: ParsedRequest, mut res: Response, shared_con: Arc<Mutex<Db
     res.send(resp_str.as_bytes()).unwrap();
 }
 
+fn announcement_current(pr: ParsedRequest, mut res: Response, shared_con: Arc<Mutex<DbCon>>) {
+    if !pr.authenticated {
+        send_unauthorized(res);
+        return;
+    }
+
+    let mut obj = Object::new();
+    let con = shared_con.lock().unwrap();
+    let actions = db::announcements::get_current(&*con);
+    obj.insert("actions".into(), actions.unwrap().to_json());
+
+    {
+        let headers = res.headers_mut();
+        headers.set(header::ContentType::json());
+    }
+    let mut resp_str = obj.to_json().to_string();
+    resp_str.push('\n');
+    res.send(resp_str.as_bytes()).unwrap();
+}
 
 fn query(pr: ParsedRequest, mut res: Response, shared_con: Arc<Mutex<DbCon>>) {
     if !pr.authenticated {

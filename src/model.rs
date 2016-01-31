@@ -107,7 +107,7 @@ pub struct AnnouncementAction {
     pub public: bool
 }
 
-#[derive(Debug)]
+#[derive(Debug,PartialEq)]
 pub enum AnnouncementMethod {
     New,
     Mod,
@@ -209,6 +209,29 @@ impl ToJson for Box<Action> {
 }
 
 
+fn get_checked_user(obj: &Object) -> Result<String, String> {
+    let user = obj.get("user").unwrap().as_string().unwrap().trim();
+    if user.len() == 0 || user.len() > 15 {
+        return Err("Bad username, unicode chars, 1 to 15 bytes\n".into());
+    }
+    Ok(String::from(user))
+}
+
+fn parse_time(json: &Json) -> Result<i64, String> {
+    match json {
+        &Json::I64(t) => Ok(t),
+        &Json::U64(t) => Ok(t as i64),
+        &Json::String(ref s) => {
+            if s == "now" {
+                Ok(UTC::now().timestamp())
+            } else {
+                Err("bad time specification".into())
+            }
+        },
+        _ => Err("bad time specification (wrong type)".into())
+    }
+}
+
 pub fn json_to_object(json: Json) -> Result<Box<Action>, String> {
     let obj = json.as_object().unwrap();
     let note = match obj.get("note") {
@@ -224,14 +247,36 @@ pub fn json_to_object(json: Json) -> Result<Box<Action>, String> {
     let base_action = BaseAction::new(note);
     match obj.get("type").unwrap().as_string().unwrap() {
         "status" => {
-            let user = obj.get("user").unwrap().as_string().unwrap().trim();
-            if user.len() == 0 || user.len() > 15 {
-                return Err("Bad username, unicode chars, 1 to 15 bytes\n".into());
-            }
+            let user = try!(get_checked_user(obj));
             Ok(Box::new(StatusAction {
                 action: base_action,
-                user: String::from(user),
+                user: user,
                 status: Status::from_str(obj.get("status").unwrap().as_string().unwrap()).unwrap()
+            }))
+        },
+        "announcement" => {
+            let user = try!(get_checked_user(obj));
+            let method = match obj.get("method").unwrap().as_string().unwrap() {
+                "new" => AnnouncementMethod::New,
+                "mod" => AnnouncementMethod::Mod,
+                "del" => AnnouncementMethod::Del,
+                _ => {
+                    return Err("bad method".into());
+                }
+            };
+            if method != AnnouncementMethod::New {
+                return Err("only method=new is supported yet".into());
+            }
+            let from = parse_time(obj.get("from").unwrap());
+            let to = parse_time(obj.get("to").unwrap());
+            Ok(Box::new(AnnouncementAction {
+                action: base_action,
+                user: user,
+                method: method,
+                aid: None,
+                from: try!(from),
+                to: try!(to),
+                public: false
             }))
         },
         _ =>

@@ -21,10 +21,14 @@ pub trait DbStored {
     fn store(&mut self, con: &DbCon) -> Option<u64>;
 }
 
-impl DbStored for BaseAction {
-    fn store(&mut self, con: &DbCon) -> Option<u64> {
+pub trait DbStoredTyped {
+    fn store(&mut self, type_: i64, con: &DbCon) -> Option<u64>;
+}
+
+impl DbStoredTyped for BaseAction {
+    fn store(&mut self, type_: i64, con: &DbCon) -> Option<u64> {
         con.execute("INSERT INTO action (time, type, note) VALUES (?, ?, ?)",
-                    &[&self.time, &0, &self.note]).unwrap();
+                    &[&self.time, &type_, &self.note]).unwrap();
         let action_id = con.last_insert_rowid() as u64;
         Some(action_id)
     }
@@ -54,7 +58,7 @@ impl DbStored for StatusAction {
                     },
                     Err(_) => (true, true)
                 };
-                let action_id = self.action.store(con).unwrap();
+                let action_id = DbStoredTyped::store(&mut self.action, 0, con).unwrap();
                 con.execute("INSERT INTO status_action (id, user, status, changed, public_changed) \
                              VALUES (?, ?, ?, ?, ?)",
                             &[&(action_id as i64), &self.user, &self.status,
@@ -155,8 +159,10 @@ impl DbStored for AnnouncementAction {
                         match self.aid {
                             None => {
                                 let transaction = con.transaction().unwrap();
-                                let action_id = self.action.store(con).unwrap();
-                                con.execute("INSERT INTO announcement_action (id, method, aid, user, 'from', 'to', public) VALUES (?, ?, ?, ?, ?, ?, ?)",
+                                let action_id = DbStoredTyped::store(&mut self.action, 1, con).unwrap();
+                                con.execute("INSERT INTO announcement_action \
+                                             (id, method, aid, user, \"from\", \"to\", public) VALUES \
+                                             (?, ?, ?, ?, ?, ?, ?)",
                                     &[&(action_id as i64), &0, &(action_id as i64),
                                       &self.user, &self.from, &self.to, &(self.public as i64)]).unwrap();
                                 self.action.id = Some(action_id);
@@ -174,7 +180,7 @@ impl DbStored for AnnouncementAction {
                             Some(aid) => {
                                 let transaction = con.transaction().unwrap();
                                 // check if last action is method=new|mod
-                                let action_id = self.action.store(con).unwrap();
+                                let action_id = DbStoredTyped::store(&mut self.action, 1, con).unwrap();
                                 con.execute("INSERT INTO announcement_action (id, method, aid, user, 'from', 'to', public) VALUES (?, ?, ?, ?, ?, ?, ?)",
                                     &[&(action_id as i64), &0, &(aid as i64),
                                       &self.user, &self.from, &self.to, &(self.public as i64)]).unwrap();
@@ -190,7 +196,7 @@ impl DbStored for AnnouncementAction {
                             Some(aid) => {
                                 let transaction = con.transaction().unwrap();
                                 // check if last action is method=new|mod
-                                let action_id = self.action.store(con).unwrap();
+                                let action_id = DbStoredTyped::store(&mut self.action, 1, con).unwrap();
                                 con.execute("INSERT INTO announcement_action (id, method, aid, user, 'from', 'to', public) VALUES (?, ?, ?, ?, ?, ?, ?)",
                                     &[&(action_id as i64), &0, &(aid as i64),
                                       &self.user, &self.from, &self.to, &(self.public as i64)]).unwrap();
@@ -235,6 +241,7 @@ pub mod announcements {
     use super::*;
     use super::super::model::*;
     use rusqlite::{SqliteResult, SqliteError, SqliteRow};
+    use chrono::*;
 
     fn row_to_announcement_action(row: SqliteRow) -> AnnouncementAction {
         AnnouncementAction{
@@ -274,6 +281,17 @@ pub mod announcements {
             Err(SqliteError{code: 27, message: _}) => Ok(None),
             Err(e) => Err(e)
         }
+    }
+
+    pub fn get_current(con: &DbCon) -> SqliteResult<Vec<AnnouncementAction>> {
+        let mut stmt = con.prepare("SELECT * FROM action JOIN announcement_action WHERE action.type = 1 AND \
+                                    action.id = announcement_action.id AND \
+                                    ? <= \"to\" \
+                                    ORDER BY 'from' LIMIT 30").unwrap();
+        let now = UTC::now().timestamp();
+        let actions_iter = stmt.query_map(&[&now], row_to_announcement_action).unwrap();
+        let actions: Vec<AnnouncementAction> = actions_iter.map(|action| { action.unwrap() }).collect();
+        Ok(actions)
     }
 }
 
