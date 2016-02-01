@@ -287,7 +287,7 @@ pub mod announcements {
         let mut stmt = con.prepare("SELECT * FROM action JOIN announcement_action WHERE action.type = 1 AND \
                                     action.id = announcement_action.id AND \
                                     ? <= \"to\" \
-                                    ORDER BY 'from' LIMIT 30").unwrap();
+                                    ORDER BY \"from\" LIMIT 30").unwrap();
         let now = UTC::now().timestamp();
         let actions_iter = stmt.query_map(&[&now], row_to_announcement_action).unwrap();
         let actions: Vec<AnnouncementAction> = actions_iter.map(|action| { action.unwrap() }).collect();
