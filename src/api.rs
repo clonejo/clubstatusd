@@ -16,6 +16,7 @@ use hyper::method::Method;
 use hyper::status::StatusCode;
 use route_recognizer::{Router, Match, Params};
 use urlparse;
+use chrono::UTC;
 
 trait Handler: Sync + Send + Any {
     fn handle(&self, pr: ParsedRequest, res: Response, con: Arc<Mutex<DbCon>>);
@@ -183,7 +184,8 @@ fn create_action(mut pr: ParsedRequest, mut res: Response, shared_con: Arc<Mutex
         Err(_) =>
             send_status(res, StatusCode::BadRequest),
         Ok(action_json) => {
-            match json_to_object(action_json) {
+            let now = UTC::now().timestamp();
+            match json_to_object(action_json, now) {
                 Ok(mut action) => {
                     let con = shared_con.lock().unwrap();
                     action.store(&*con);

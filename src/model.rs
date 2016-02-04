@@ -217,13 +217,13 @@ fn get_checked_user(obj: &Object) -> Result<String, String> {
     Ok(String::from(user))
 }
 
-fn parse_time(json: &Json) -> Result<i64, String> {
+fn parse_time(json: &Json, now: i64) -> Result<i64, String> {
     match json {
         &Json::I64(t) => Ok(t),
         &Json::U64(t) => Ok(t as i64),
         &Json::String(ref s) => {
             if s == "now" {
-                Ok(UTC::now().timestamp())
+                Ok(now)
             } else {
                 Err("bad time specification".into())
             }
@@ -232,7 +232,10 @@ fn parse_time(json: &Json) -> Result<i64, String> {
     }
 }
 
-pub fn json_to_object(json: Json) -> Result<Box<Action>, String> {
+/*
+ * also checks validity of entered values
+ */
+pub fn json_to_object(json: Json, now: i64) -> Result<Box<Action>, String> {
     let obj = json.as_object().unwrap();
     let note = match obj.get("note") {
         Some(j) => {
@@ -264,20 +267,30 @@ pub fn json_to_object(json: Json) -> Result<Box<Action>, String> {
                     return Err("bad method".into());
                 }
             };
-            if method != AnnouncementMethod::New {
-                return Err("only method=new is supported yet".into());
+            match method {
+                AnnouncementMethod::New => {
+                    let from = try!(parse_time(obj.get("from").unwrap(), now));
+                    let to = try!(parse_time(obj.get("to").unwrap(), now));
+                    if from > to {
+                        return Err("from must be <= to".into());
+                    }
+                    if from < now {
+                        return Err("from must be >= now".into());
+                    }
+                    Ok(Box::new(AnnouncementAction {
+                        action: base_action,
+                        user: user,
+                        method: method,
+                        aid: None,
+                        from: from,
+                        to: to,
+                        public: false
+                    }))
+                },
+                _ => {
+                    return Err("only method=new is supported yet".into());
+                }
             }
-            let from = parse_time(obj.get("from").unwrap());
-            let to = parse_time(obj.get("to").unwrap());
-            Ok(Box::new(AnnouncementAction {
-                action: base_action,
-                user: user,
-                method: method,
-                aid: None,
-                from: try!(from),
-                to: try!(to),
-                public: false
-            }))
         },
         _ =>
             Err("Unknown action type\n".into())
