@@ -180,9 +180,15 @@ impl DbStored for AnnouncementAction {
                             Some(aid) => {
                                 let transaction = con.transaction().unwrap();
                                 // check if last action is method=new|mod
+                                let last_action = match announcements::get_last(aid, con).unwrap() {
+                                    None => return None,
+                                    Some(AnnouncementAction{method: AnnouncementMethod::Del, ..}) =>
+                                        return None,
+                                    Some(a) => a,
+                                };
                                 let action_id = DbStoredTyped::store(&mut self.action, 1, con).unwrap();
                                 con.execute("INSERT INTO announcement_action (id, method, aid, user, 'from', 'to', public) VALUES (?, ?, ?, ?, ?, ?, ?)",
-                                    &[&(action_id as i64), &0, &(aid as i64),
+                                    &[&(action_id as i64), &1, &(aid as i64),
                                       &self.user, &self.from, &self.to, &(self.public as i64)]).unwrap();
                                 self.action.id = Some(action_id);
                                 transaction.commit().unwrap();
@@ -196,9 +202,18 @@ impl DbStored for AnnouncementAction {
                             Some(aid) => {
                                 let transaction = con.transaction().unwrap();
                                 // check if last action is method=new|mod
+                                let last_action = match announcements::get_last(aid, con).unwrap() {
+                                    None => return None,
+                                    Some(AnnouncementAction{method: AnnouncementMethod::Del, ..}) =>
+                                        return None,
+                                    Some(a) => a,
+                                };
+                                self.from = last_action.from;
+                                self.to = last_action.to;
+                                self.public = last_action.public;
                                 let action_id = DbStoredTyped::store(&mut self.action, 1, con).unwrap();
                                 con.execute("INSERT INTO announcement_action (id, method, aid, user, 'from', 'to', public) VALUES (?, ?, ?, ?, ?, ?, ?)",
-                                    &[&(action_id as i64), &0, &(aid as i64),
+                                    &[&(action_id as i64), &2, &(aid as i64),
                                       &self.user, &self.from, &self.to, &(self.public as i64)]).unwrap();
                                 self.action.id = Some(action_id);
                                 transaction.commit().unwrap();
@@ -284,9 +299,13 @@ pub mod announcements {
     }
 
     pub fn get_current(con: &DbCon) -> SqliteResult<Vec<AnnouncementAction>> {
-        let mut stmt = con.prepare("SELECT * FROM action JOIN announcement_action WHERE action.type = 1 AND \
+        let mut stmt = con.prepare("SELECT * FROM action JOIN announcement_action WHERE \
+                                    action.id IN ( \
+                                        SELECT max(id) FROM announcement_action GROUP BY aid \
+                                    ) AND \
                                     action.id = announcement_action.id AND \
-                                    ? <= \"to\" \
+                                    ? <= \"to\" AND \
+                                    announcement_action.method != 2 \
                                     ORDER BY \"from\" LIMIT 30").unwrap();
         let now = UTC::now().timestamp();
         let actions_iter = stmt.query_map(&[&now], row_to_announcement_action).unwrap();

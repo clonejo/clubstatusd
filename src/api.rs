@@ -188,14 +188,20 @@ fn create_action(mut pr: ParsedRequest, mut res: Response, shared_con: Arc<Mutex
             match json_to_object(action_json, now) {
                 Ok(mut action) => {
                     let con = shared_con.lock().unwrap();
-                    action.store(&*con);
-                    {
-                        let headers = res.headers_mut();
-                        headers.set(header::ContentType::json());
+                    match action.store(&*con) {
+                        Some(action_id) => {
+                            {
+                                let headers = res.headers_mut();
+                                headers.set(header::ContentType::json());
+                            }
+                            let mut resp_str = format!("{}", action_id);
+                            resp_str.push('\n');
+                            res.send(resp_str.as_bytes()).unwrap();
+                        },
+                        None => {
+                            send(res, StatusCode::BadRequest, "bad request".as_bytes())
+                        }
                     }
-                    let mut resp_str = format!("{}", action.get_base_action().id.unwrap());
-                    resp_str.push('\n');
-                    res.send(resp_str.as_bytes()).unwrap();
                 },
                 Err(msg) => {
                     send(res, StatusCode::BadRequest, msg.as_bytes());

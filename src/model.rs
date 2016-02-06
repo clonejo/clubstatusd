@@ -2,6 +2,7 @@
 use chrono::*;
 use rustc_serialize::json::{Json, Object, ToJson};
 use db::DbStored;
+use db;
 
 #[derive(Debug)]
 pub struct BaseAction {
@@ -217,6 +218,26 @@ fn get_checked_user(obj: &Object) -> Result<String, String> {
     Ok(String::from(user))
 }
 
+fn get_method(obj: &Object) -> Result<AnnouncementMethod, String> {
+    match obj.get("method").unwrap().as_string().unwrap() {
+        "new" => Ok(AnnouncementMethod::New),
+        "mod" => Ok(AnnouncementMethod::Mod),
+        "del" => Ok(AnnouncementMethod::Del),
+        _ => {
+            Err("bad method".into())
+        }
+    }
+}
+
+fn get_from_to(obj: &Object, now: i64) -> Result<(i64, i64), String> {
+    let from = try!(parse_time(obj.get("from").unwrap(), now));
+    let to = try!(parse_time(obj.get("to").unwrap(), now));
+    if from > to {
+        return Err("from must be <= to".into());
+    }
+    Ok((from, to))
+}
+
 fn parse_time(json: &Json, now: i64) -> Result<i64, String> {
     match json {
         &Json::I64(t) => Ok(t),
@@ -259,21 +280,10 @@ pub fn json_to_object(json: Json, now: i64) -> Result<Box<Action>, String> {
         },
         "announcement" => {
             let user = try!(get_checked_user(obj));
-            let method = match obj.get("method").unwrap().as_string().unwrap() {
-                "new" => AnnouncementMethod::New,
-                "mod" => AnnouncementMethod::Mod,
-                "del" => AnnouncementMethod::Del,
-                _ => {
-                    return Err("bad method".into());
-                }
-            };
+            let method = try!(get_method(obj));
             match method {
                 AnnouncementMethod::New => {
-                    let from = try!(parse_time(obj.get("from").unwrap(), now));
-                    let to = try!(parse_time(obj.get("to").unwrap(), now));
-                    if from > to {
-                        return Err("from must be <= to".into());
-                    }
+                    let (from, to) = get_from_to(obj, now).unwrap();
                     if from < now {
                         return Err("from must be >= now".into());
                     }
@@ -287,8 +297,30 @@ pub fn json_to_object(json: Json, now: i64) -> Result<Box<Action>, String> {
                         public: false
                     }))
                 },
-                _ => {
-                    return Err("only method=new is supported yet".into());
+                AnnouncementMethod::Mod => {
+                    let aid = obj.get("aid").unwrap().as_u64().unwrap();
+                    let (from, to) = get_from_to(obj, now).unwrap();
+                    Ok(Box::new(AnnouncementAction {
+                        action: base_action,
+                        user: user,
+                        method: method,
+                        aid: Some(aid),
+                        from: from,
+                        to: to,
+                        public: false
+                    }))
+                }
+                AnnouncementMethod::Del => {
+                    let aid = obj.get("aid").unwrap().as_u64().unwrap();
+                    Ok(Box::new(AnnouncementAction {
+                        action: base_action,
+                        user: user,
+                        method: method,
+                        aid: Some(aid),
+                        from: 0,      // overwritten by DbStored::store()
+                        to: 0,        // overwritten by DbStored::store()
+                        public: false // overwritten by DbStored::store()
+                    }))
                 }
             }
         },
