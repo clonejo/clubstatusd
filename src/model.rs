@@ -2,7 +2,6 @@
 use chrono::*;
 use rustc_serialize::json::{Json, Object, ToJson};
 use db::DbStored;
-use db;
 
 #[derive(Debug)]
 pub struct BaseAction {
@@ -33,6 +32,14 @@ impl BaseAction {
     }
 }
 
+#[derive(Debug, PartialEq)]
+pub enum QueryActionType {
+    Status,
+    Announcement,
+    Presence,
+    All
+}
+
 #[derive(Debug)]
 pub struct StatusAction {
     pub action: BaseAction,
@@ -40,7 +47,7 @@ pub struct StatusAction {
     pub status: Status
 }
 
-#[derive(Debug,PartialEq)]
+#[derive(Debug, PartialEq)]
 pub enum Status {
     Public,
     Private,
@@ -253,14 +260,20 @@ fn parse_time(json: &Json, now: i64) -> Result<i64, String> {
     }
 }
 
+
+pub enum RequestObject {
+    Action(Box<Action>),
+    PresenceRequest(String, String)
+}
+
 /*
  * also checks validity of entered values
  */
-pub fn json_to_object(json: Json, now: i64) -> Result<Box<Action>, String> {
+pub fn json_to_object(json: Json, now: i64) -> Result<RequestObject, String> {
     let obj = json.as_object().unwrap();
     let note = match obj.get("note") {
         Some(j) => {
-            let note =j.as_string().unwrap();
+            let note = j.as_string().unwrap();
             if note.len() > 80 {
                 return Err("Bad note, unicode chars, maximum 80 bytes\n".into());
             }
@@ -272,11 +285,11 @@ pub fn json_to_object(json: Json, now: i64) -> Result<Box<Action>, String> {
     match obj.get("type").unwrap().as_string().unwrap() {
         "status" => {
             let user = try!(get_checked_user(obj));
-            Ok(Box::new(StatusAction {
+            Ok(RequestObject::Action(Box::new(StatusAction {
                 action: base_action,
                 user: user,
                 status: Status::from_str(obj.get("status").unwrap().as_string().unwrap()).unwrap()
-            }))
+            })))
         },
         "announcement" => {
             let user = try!(get_checked_user(obj));
@@ -287,7 +300,7 @@ pub fn json_to_object(json: Json, now: i64) -> Result<Box<Action>, String> {
                     if from < now {
                         return Err("from must be >= now".into());
                     }
-                    Ok(Box::new(AnnouncementAction {
+                    Ok(RequestObject::Action(Box::new(AnnouncementAction {
                         action: base_action,
                         user: user,
                         method: method,
@@ -295,12 +308,12 @@ pub fn json_to_object(json: Json, now: i64) -> Result<Box<Action>, String> {
                         from: from,
                         to: to,
                         public: false
-                    }))
+                    })))
                 },
                 AnnouncementMethod::Mod => {
                     let aid = obj.get("aid").unwrap().as_u64().unwrap();
                     let (from, to) = get_from_to(obj, now).unwrap();
-                    Ok(Box::new(AnnouncementAction {
+                    Ok(RequestObject::Action(Box::new(AnnouncementAction {
                         action: base_action,
                         user: user,
                         method: method,
@@ -308,11 +321,11 @@ pub fn json_to_object(json: Json, now: i64) -> Result<Box<Action>, String> {
                         from: from,
                         to: to,
                         public: false
-                    }))
+                    })))
                 }
                 AnnouncementMethod::Del => {
                     let aid = obj.get("aid").unwrap().as_u64().unwrap();
-                    Ok(Box::new(AnnouncementAction {
+                    Ok(RequestObject::Action(Box::new(AnnouncementAction {
                         action: base_action,
                         user: user,
                         method: method,
@@ -320,9 +333,14 @@ pub fn json_to_object(json: Json, now: i64) -> Result<Box<Action>, String> {
                         from: 0,      // overwritten by DbStored::store()
                         to: 0,        // overwritten by DbStored::store()
                         public: false // overwritten by DbStored::store()
-                    }))
+                    })))
                 }
             }
+        },
+        "presence" => {
+            let user = try!(get_checked_user(obj));
+            let api_key = String::from(obj.get("api_key").unwrap().as_string().unwrap());
+            Ok(RequestObject::PresenceRequest(user, api_key))
         },
         _ =>
             Err("Unknown action type\n".into())

@@ -13,7 +13,7 @@ pub type DbCon = SqliteConnection;
 
 pub fn connect(path_str: &str) -> Result<DbCon, SqliteError> {
     let path = Path::new(path_str);
-    ensure_initialized(path);
+    ensure_initialized(path).unwrap();
     SqliteConnection::open(path)
 }
 
@@ -180,7 +180,7 @@ impl DbStored for AnnouncementAction {
                             Some(aid) => {
                                 let transaction = con.transaction().unwrap();
                                 // check if last action is method=new|mod
-                                let last_action = match announcements::get_last(aid, con).unwrap() {
+                                let _last_action = match announcements::get_last(aid, con).unwrap() {
                                     None => return None,
                                     Some(AnnouncementAction{method: AnnouncementMethod::Del, ..}) =>
                                         return None,
@@ -345,6 +345,13 @@ pub mod presence {
     use super::*;
     use super::super::model::*;
     use rusqlite::{SqliteResult, SqliteRow};
+    use std::sync::mpsc::{channel, Sender, TryRecvError};
+    use std::thread;
+    use std::time::Duration;
+    use std::collections::HashMap;
+    use std::iter::FromIterator;
+    use std::sync::{Arc, Mutex};
+    use chrono::UTC;
 
     fn row_to_base_action(row: SqliteRow) -> BaseAction {
         BaseAction {
@@ -393,20 +400,94 @@ pub mod presence {
                 Err(e)
         }
     }
+
+    pub fn start_tracker(shared_con: Arc<Mutex<DbCon>>) -> Sender<String> {
+        let (tx, rx) = channel::<String>();
+        thread::spawn(move || {
+            #[derive(Debug)]
+            struct UserPresence {
+                since: i64,
+                last_seen: i64
+            }
+            let mut users: HashMap<String, UserPresence> = HashMap::new();
+            loop {
+                let now = UTC::now().timestamp();
+                loop {
+                    match rx.try_recv() {
+                        Ok(username) => {
+                            let mut presence = users.entry(username).or_insert(
+                                UserPresence{since: now, last_seen: now});
+                            presence.last_seen = now;
+                        },
+                        Err(TryRecvError::Empty) => {
+                            break;
+                        },
+                        Err(TryRecvError::Disconnected) => {
+                            return;
+                        }
+                    }
+                }
+                let new_users: HashMap<String, UserPresence> =
+                    HashMap::from_iter(users.drain().filter(|&(_, ref presence)| {
+                        // presence requests time out after 11min + time slept
+                        // a presence request makes the user present in the next two presence
+                        // actions
+                        presence.last_seen + 11*60 >= now
+                    }));
+                users = new_users;
+                let mut present_users = Vec::new();
+                for (username, presence) in users.iter() {
+                    present_users.push(PresentUser{name: username.clone(), since: presence.since});
+                }
+
+                {
+                    let con = shared_con.lock().unwrap();
+                    let mut presence_action = PresenceAction::new(String::from(""), present_users);
+                    presence_action.store(&*con);
+                }
+                thread::sleep(Duration::new(10*60, 0)); // create one presence action every 10min
+            }
+        });
+        tx
+    }
 }
 
-pub fn query(count: u64, con: &DbCon) -> SqliteResult<Vec<Box<Action>>> {
+pub fn query(type_: QueryActionType, count: u64, con: &DbCon) -> SqliteResult<Vec<Box<Action>>> {
     let transaction = con.transaction().unwrap();
-    let mut stmt = con.prepare("SELECT id, type FROM action ORDER BY id DESC LIMIT ?").unwrap();
-    let actions_iter = stmt.query_map(&[&(count as i64)], |row| -> Box<Action> {
+    let mut query_str = String::from("SELECT id, type FROM action");
+
+    // for livetime reasons we need to define these variables before params:
+    let count = count as i64;
+    let type_int;
+
+    let mut params = Vec::<&ToSql>::new();
+
+    if type_ != QueryActionType::All {
+        type_int = match type_ {
+            QueryActionType::Status => 0,
+            QueryActionType::Announcement => 1,
+            QueryActionType::Presence => 2,
+            _ => panic!() // impossible
+        };
+        query_str.push_str(" WHERE type=?");
+        params.push(&type_int);
+    }
+
+    query_str.push_str(" ORDER BY id DESC LIMIT ?");
+    params.push(&count);
+
+    let mut stmt = con.prepare(&query_str[..]).unwrap();
+    let row_iter = stmt.query(&*params).unwrap();
+    let actions_iter = row_iter.map(|r| -> Box<Action> {
+        let row = r.unwrap();
         match row.get(1) {
             0 => Box::new(status::get_by_id(row.get::<i64>(0) as u64, con).unwrap()) as Box<Action>,
             1 => Box::new(announcements::get_by_id(row.get::<i64>(0) as u64, con).unwrap()) as Box<Action>,
             2 => Box::new(presence::get_by_id(row.get::<i64>(0) as u64, con).unwrap()) as Box<Action>,
             id => panic!("unknown action type in db: {}", id)
         }
-    }).unwrap();
-    let mut actions: Vec<Box<Action>> = actions_iter.map(|action| { action.unwrap() }).collect();
+    });
+    let mut actions: Vec<Box<Action>> = actions_iter.collect();
     actions.reverse();
     transaction.commit().unwrap();
     Ok(actions)

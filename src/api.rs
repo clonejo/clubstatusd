@@ -2,13 +2,16 @@
 use std::any::Any;
 use std::cmp::min;
 use std::str;
+use std::str::FromStr;
 use std::collections::HashMap;
+use std::num::ParseIntError;
 use db::DbCon;
 use db;
 use rustc_serialize::json::{Json, Object, ToJson};
 use std::sync::{Arc, Mutex};
 use std::io::Read;
-use model::{json_to_object, Action};
+use std::sync::mpsc::Sender;
+use model::{json_to_object, QueryActionType, RequestObject};
 use hyper::server::{Server, Request, Response};
 use hyper::header;
 use hyper::uri::RequestUri;
@@ -19,13 +22,15 @@ use urlparse;
 use chrono::UTC;
 
 trait Handler: Sync + Send + Any {
-    fn handle(&self, pr: ParsedRequest, res: Response, con: Arc<Mutex<DbCon>>);
+    fn handle(&self, pr: ParsedRequest, res: Response, con: Arc<Mutex<DbCon>>,
+              presence_tracker: Arc<Mutex<Sender<String>>>);
 }
 
 impl<F> Handler for F
-where F: Send + Sync + Any + Fn(ParsedRequest, Response, Arc<Mutex<DbCon>>) {
-    fn handle(&self, pr: ParsedRequest, res: Response, con: Arc<Mutex<DbCon>>) {
-        (*self)(pr, res, con);
+where F: Send + Sync + Any + Fn(ParsedRequest, Response, Arc<Mutex<DbCon>>, Arc<Mutex<Sender<String>>>) {
+    fn handle(&self, pr: ParsedRequest, res: Response, con: Arc<Mutex<DbCon>>,
+              presence_tracker: Arc<Mutex<Sender<String>>>) {
+        (*self)(pr, res, con, presence_tracker);
     }
 }
 
@@ -41,6 +46,8 @@ struct ParsedRequest<'a, 'b: 'a> {
 pub fn run(con: DbCon, listen: &str, password: Option<&str>) {
     let shared_con = Arc::new(Mutex::new(con));
     let password = password.map(|s| String::from(s));
+
+    let presence_tracker = Arc::new(Mutex::new(db::presence::start_tracker(shared_con.clone())));
 
     let mut router: Router<(Method, Box<Handler>)> = Router::new();
     router.add("/api/versions", (Method::Get, Box::new(api_versions)));
@@ -70,7 +77,7 @@ pub fn run(con: DbCon, listen: &str, password: Option<&str>) {
                         get_params_str: get_params_string,
                         authenticated: authenticated
                     };
-                    handler.handle(pr, res, shared_con.clone());
+                    handler.handle(pr, res, shared_con.clone(), presence_tracker.clone());
                 } else {
                     send_status(res, StatusCode::MethodNotAllowed);
                 }
@@ -129,7 +136,7 @@ fn parse_get_params<'a>(get_params_str: Option<String>) -> GetParams<'a> {
             }
         },
         None => {}
-    }
+    };
     params
 }
 
@@ -154,7 +161,8 @@ fn send(mut res: Response, status: StatusCode, msg: &[u8]) {
     res.send(msg).unwrap();
 }
 
-fn api_versions(_pr: ParsedRequest, mut res: Response, _shared_con: Arc<Mutex<DbCon>>) {
+fn api_versions(_pr: ParsedRequest, mut res: Response, _shared_con: Arc<Mutex<DbCon>>,
+                _: Arc<Mutex<Sender<String>>>) {
     let mut obj = Object::new();
     obj.insert("versions".into(), [0].to_json());
     {
@@ -170,7 +178,8 @@ fn api_versions(_pr: ParsedRequest, mut res: Response, _shared_con: Arc<Mutex<Db
 /*
  * PUT
  */
-fn create_action(mut pr: ParsedRequest, mut res: Response, shared_con: Arc<Mutex<DbCon>>) {
+fn create_action(mut pr: ParsedRequest, mut res: Response, shared_con: Arc<Mutex<DbCon>>,
+                 presence_tracker: Arc<Mutex<Sender<String>>>) {
     if !pr.authenticated {
         send_unauthorized(res);
         return;
@@ -186,7 +195,7 @@ fn create_action(mut pr: ParsedRequest, mut res: Response, shared_con: Arc<Mutex
         Ok(action_json) => {
             let now = UTC::now().timestamp();
             match json_to_object(action_json, now) {
-                Ok(mut action) => {
+                Ok(RequestObject::Action(mut action)) => {
                     let con = shared_con.lock().unwrap();
                     match action.store(&*con) {
                         Some(action_id) => {
@@ -203,6 +212,9 @@ fn create_action(mut pr: ParsedRequest, mut res: Response, shared_con: Arc<Mutex
                         }
                     }
                 },
+                Ok(RequestObject::PresenceRequest(username, entered_api_key)) => {
+                    presence_tracker.lock().unwrap().send(username).unwrap();
+                },
                 Err(msg) => {
                     send(res, StatusCode::BadRequest, msg.as_bytes());
                 }
@@ -214,7 +226,8 @@ fn create_action(mut pr: ParsedRequest, mut res: Response, shared_con: Arc<Mutex
 /*
  * GET
  */
-fn status_current(pr: ParsedRequest, mut res: Response, shared_con: Arc<Mutex<DbCon>>) {
+fn status_current(pr: ParsedRequest, mut res: Response, shared_con: Arc<Mutex<DbCon>>,
+                  _: Arc<Mutex<Sender<String>>>) {
     let get_params = parse_get_params(pr.get_params_str);
     let public_api = get_params.contains_key("public");
     if !public_api && !pr.authenticated {
@@ -249,7 +262,8 @@ fn status_current(pr: ParsedRequest, mut res: Response, shared_con: Arc<Mutex<Db
     res.send(resp_str.as_bytes()).unwrap();
 }
 
-fn announcement_current(pr: ParsedRequest, mut res: Response, shared_con: Arc<Mutex<DbCon>>) {
+fn announcement_current(pr: ParsedRequest, mut res: Response, shared_con: Arc<Mutex<DbCon>>,
+                        _: Arc<Mutex<Sender<String>>>) {
     if !pr.authenticated {
         send_unauthorized(res);
         return;
@@ -269,18 +283,106 @@ fn announcement_current(pr: ParsedRequest, mut res: Response, shared_con: Arc<Mu
     res.send(resp_str.as_bytes()).unwrap();
 }
 
-fn query(pr: ParsedRequest, mut res: Response, shared_con: Arc<Mutex<DbCon>>) {
+
+enum RangeExpr<T> {
+    Single(T),
+    Range(T, T)
+}
+
+impl<T: FromStr> FromStr for RangeExpr<T> {
+    type Err = T::Err;
+
+    fn from_str(s: &str) -> Result<Self, T::Err> {
+        let mut parts = s.splitn(2, ':');
+        let start = try!(parts.next().unwrap().parse());
+        Ok(match parts.next() {
+            None => {
+                RangeExpr::Single(start)
+            },
+            Some(e) => {
+                RangeExpr::Range(start, try!(e.parse()))
+            }
+        })
+    }
+}
+
+enum IdExpr {
+    Int(u64),
+    Last
+}
+
+impl FromStr for IdExpr {
+    type Err = ParseIntError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "last" => {
+                Ok(IdExpr::Last)
+            },
+            _ => {
+                s.parse()
+            }
+        }
+    }
+}
+
+fn query(pr: ParsedRequest, mut res: Response, shared_con: Arc<Mutex<DbCon>>,
+         _: Arc<Mutex<Sender<String>>>) {
     if !pr.authenticated {
         send_unauthorized(res);
         return;
     }
-    let count = 20;
-    let count: u64 = min(count, 100);
 
+    let type_ = match pr.path_params.find("type").unwrap() {
+        "all" => QueryActionType::All,
+        "status" => QueryActionType::Status,
+        "announcement" => QueryActionType::Announcement,
+        "presence" => QueryActionType::Presence,
+        _ => {
+            send(res, StatusCode::BadRequest, "bad action type".as_bytes());
+            return;
+        }
+    };
+
+    let get_params = parse_get_params(pr.get_params_str);
+    let id: Option<RangeExpr<IdExpr>> = match get_params.get("id") {
+        None => None,
+        Some(&None) => None,
+        Some(&Some(ref s)) => {
+            match s.parse() {
+                Ok(id) => Some(id),
+                Err(_) => {
+                    send(res, StatusCode::BadRequest, "bad parameter: id".as_bytes());
+                    return;
+                }
+            }
+        }
+    };
+    let count = match get_params.get("count") {
+        None => 20,
+        Some(&None) => 20,
+        Some(&Some(ref s)) => {
+            match s.parse() {
+                Ok(i) => i,
+                Err(_) => {
+                    send(res, StatusCode::BadRequest, "bad parameter: count".as_bytes());
+                    return;
+                }
+            }
+        }
+    };
+    let count: u64 = min(count, 100);
+    let id_is_single = id.map(|range| match range {
+        RangeExpr::Single(_) => true,
+        RangeExpr::Range(_, _) => false
+    }).unwrap_or(false);
+    let count = if id_is_single { 1 } else { count };
+
+    //println!("type: {:?} count: {:?}", type_, count);
 
     let mut obj = Object::new();
     let con = shared_con.lock().unwrap();
-    let actions = db::query(count, &*con);
+    let actions = db::query(type_, count, &*con);
     obj.insert("actions".into(), actions.unwrap().to_json());
 
     {
