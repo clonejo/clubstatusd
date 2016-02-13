@@ -263,7 +263,7 @@ fn parse_time(json: &Json, now: i64) -> Result<i64, String> {
 
 pub enum RequestObject {
     Action(Box<Action>),
-    PresenceRequest(String, String)
+    PresenceRequest(String)
 }
 
 /*
@@ -339,8 +339,7 @@ pub fn json_to_object(json: Json, now: i64) -> Result<RequestObject, String> {
         },
         "presence" => {
             let user = try!(get_checked_user(obj));
-            let api_key = String::from(obj.get("api_key").unwrap().as_string().unwrap());
-            Ok(RequestObject::PresenceRequest(user, api_key))
+            Ok(RequestObject::PresenceRequest(user))
         },
         _ =>
             Err("Unknown action type\n".into())

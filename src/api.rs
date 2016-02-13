@@ -212,7 +212,7 @@ fn create_action(mut pr: ParsedRequest, mut res: Response, shared_con: Arc<Mutex
                         }
                     }
                 },
-                Ok(RequestObject::PresenceRequest(username, entered_api_key)) => {
+                Ok(RequestObject::PresenceRequest(username)) => {
                     presence_tracker.lock().unwrap().send(username).unwrap();
                 },
                 Err(msg) => {
