@@ -411,6 +411,7 @@ pub mod presence {
             }
             let mut users: HashMap<String, UserPresence> = HashMap::new();
             loop {
+                thread::sleep(Duration::new(10*60, 0)); // create one presence action every 10min
                 let now = UTC::now().timestamp();
                 loop {
                     match rx.try_recv() {
@@ -445,7 +446,6 @@ pub mod presence {
                     let mut presence_action = PresenceAction::new(String::from(""), present_users);
                     presence_action.store(&*con);
                 }
-                thread::sleep(Duration::new(10*60, 0)); // create one presence action every 10min
             }
         });
         tx
