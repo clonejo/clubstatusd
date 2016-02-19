@@ -296,7 +296,7 @@ pub fn json_to_object(json: Json, now: i64) -> Result<RequestObject, String> {
             let method = try!(get_method(obj));
             match method {
                 AnnouncementMethod::New => {
-                    let (from, to) = get_from_to(obj, now).unwrap();
+                    let (from, to) = try!(get_from_to(obj, now));
                     if from < now {
                         return Err("from must be >= now".into());
                     }
