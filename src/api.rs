@@ -264,14 +264,20 @@ fn status_current(pr: ParsedRequest, mut res: Response, shared_con: Arc<Mutex<Db
 
 fn announcement_current(pr: ParsedRequest, mut res: Response, shared_con: Arc<Mutex<DbCon>>,
                         _: Arc<Mutex<Sender<String>>>) {
-    if !pr.authenticated {
+    let get_params = parse_get_params(pr.get_params_str);
+    let public_api = get_params.contains_key("public");
+    if !public_api && !pr.authenticated {
         send_unauthorized(res);
         return;
     }
 
     let mut obj = Object::new();
     let con = shared_con.lock().unwrap();
-    let actions = db::announcements::get_current(&*con);
+    let actions = if public_api {
+        db::announcements::get_current_public(&*con)
+    } else {
+        db::announcements::get_current(&*con)
+    };
     obj.insert("actions".into(), actions.unwrap().to_json());
 
     {

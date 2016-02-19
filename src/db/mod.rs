@@ -312,6 +312,22 @@ pub mod announcements {
         let actions: Vec<AnnouncementAction> = actions_iter.map(|action| { action.unwrap() }).collect();
         Ok(actions)
     }
+
+    pub fn get_current_public(con: &DbCon) -> SqliteResult<Vec<AnnouncementAction>> {
+        let mut stmt = con.prepare("SELECT * FROM action JOIN announcement_action WHERE \
+                                    action.id IN ( \
+                                        SELECT max(id) FROM announcement_action GROUP BY aid \
+                                    ) AND \
+                                    action.id = announcement_action.id AND \
+                                    ? <= \"to\" AND \
+                                    announcement_action.method != 2 AND \
+                                    announcement_action.public = 1 \
+                                    ORDER BY \"from\" LIMIT 30").unwrap();
+        let now = UTC::now().timestamp();
+        let actions_iter = stmt.query_map(&[&now], row_to_announcement_action).unwrap();
+        let actions: Vec<AnnouncementAction> = actions_iter.map(|action| { action.unwrap() }).collect();
+        Ok(actions)
+    }
 }
 
 
