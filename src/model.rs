@@ -260,6 +260,18 @@ fn parse_time(json: &Json, now: i64) -> Result<i64, String> {
     }
 }
 
+fn get_public(obj: &Object) -> Result<bool, String> {
+    match obj.get("public") {
+        None => Ok(false),
+        Some(v) => {
+            match v.as_boolean() {
+                Some(b) => Ok(b),
+                None => Err("bad value for 'public'".into())
+            }
+        }
+    }
+}
+
 
 pub enum RequestObject {
     Action(Box<Action>),
@@ -300,6 +312,7 @@ pub fn json_to_object(json: Json, now: i64) -> Result<RequestObject, String> {
                     if from < now {
                         return Err("from must be >= now".into());
                     }
+                    let public = try!(get_public(obj));
                     Ok(RequestObject::Action(Box::new(AnnouncementAction {
                         action: base_action,
                         user: user,
@@ -307,12 +320,13 @@ pub fn json_to_object(json: Json, now: i64) -> Result<RequestObject, String> {
                         aid: None,
                         from: from,
                         to: to,
-                        public: false
+                        public: public
                     })))
                 },
                 AnnouncementMethod::Mod => {
                     let aid = obj.get("aid").unwrap().as_u64().unwrap();
                     let (from, to) = get_from_to(obj, now).unwrap();
+                    let public = try!(get_public(obj));
                     Ok(RequestObject::Action(Box::new(AnnouncementAction {
                         action: base_action,
                         user: user,
@@ -320,7 +334,7 @@ pub fn json_to_object(json: Json, now: i64) -> Result<RequestObject, String> {
                         aid: Some(aid),
                         from: from,
                         to: to,
-                        public: false
+                        public: public
                     })))
                 }
                 AnnouncementMethod::Del => {
