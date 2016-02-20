@@ -283,6 +283,9 @@ fn announcement_current(pr: ParsedRequest, mut res: Response, shared_con: Arc<Mu
     {
         let headers = res.headers_mut();
         headers.set(header::ContentType::json());
+        if public_api {
+            headers.set(header::AccessControlAllowOrigin::Any);
+        }
     }
     let mut resp_str = obj.to_json().to_string();
     resp_str.push('\n');
