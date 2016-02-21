@@ -1,6 +1,6 @@
 
 use std::any::Any;
-use std::cmp::min;
+use std::cmp::{min, Ordering};
 use std::str;
 use std::str::FromStr;
 use std::collections::HashMap;
@@ -293,12 +293,32 @@ fn announcement_current(pr: ParsedRequest, mut res: Response, shared_con: Arc<Mu
 }
 
 
-enum RangeExpr<T> {
+#[derive(Debug)]
+pub enum RangeExpr<T> {
     Single(T),
     Range(T, T)
 }
 
-impl<T: FromStr> FromStr for RangeExpr<T> {
+impl<T: PartialOrd> RangeExpr<T> {
+    fn range(first: T, second: T) -> Self {
+        if first == second {
+            RangeExpr::Single(first)
+        } else if first <= second {
+            RangeExpr::Range(first, second)
+        } else {
+            RangeExpr::Range(second, first)
+        }
+    }
+
+    fn is_single(&self) -> bool {
+        match self {
+            &RangeExpr::Single(_) => true,
+            &RangeExpr::Range(_, _) => false
+        }
+    }
+}
+
+impl<T: FromStr+PartialOrd> FromStr for RangeExpr<T> {
     type Err = T::Err;
 
     fn from_str(s: &str) -> Result<Self, T::Err> {
@@ -309,15 +329,29 @@ impl<T: FromStr> FromStr for RangeExpr<T> {
                 RangeExpr::Single(start)
             },
             Some(e) => {
-                RangeExpr::Range(start, try!(e.parse()))
+                RangeExpr::range(start, try!(e.parse()))
             }
         })
     }
 }
 
-enum IdExpr {
+#[derive(Debug, PartialEq)]
+pub enum IdExpr {
     Int(u64),
     Last
+}
+
+impl PartialOrd for IdExpr {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        use api::IdExpr::*;
+
+        match (self, other) {
+            (&Int(i1), &Int(i2)) => i1.partial_cmp(&i2),
+            (&Int(i1), &Last) => Some(Ordering::Less),
+            (&Last, &Int(i2)) => Some(Ordering::Greater),
+            (&Last, &Last) => Some(Ordering::Equal)
+        }
+    }
 }
 
 impl FromStr for IdExpr {
@@ -329,7 +363,7 @@ impl FromStr for IdExpr {
                 Ok(IdExpr::Last)
             },
             _ => {
-                s.parse()
+                Ok(IdExpr::Int(s.parse().unwrap()))
             }
         }
     }
@@ -354,12 +388,12 @@ fn query(pr: ParsedRequest, mut res: Response, shared_con: Arc<Mutex<DbCon>>,
     };
 
     let get_params = parse_get_params(pr.get_params_str);
-    let id: Option<RangeExpr<IdExpr>> = match get_params.get("id") {
-        None => None,
-        Some(&None) => None,
+    let id: RangeExpr<IdExpr> = match get_params.get("id") {
+        None => RangeExpr::range(IdExpr::Int(0), IdExpr::Last),
+        Some(&None) => RangeExpr::range(IdExpr::Int(0), IdExpr::Last),
         Some(&Some(ref s)) => {
             match s.parse() {
-                Ok(id) => Some(id),
+                Ok(id) => id,
                 Err(_) => {
                     send(res, StatusCode::BadRequest, "bad parameter: id".as_bytes());
                     return;
@@ -381,17 +415,13 @@ fn query(pr: ParsedRequest, mut res: Response, shared_con: Arc<Mutex<DbCon>>,
         }
     };
     let count: u64 = min(count, 100);
-    let id_is_single = id.map(|range| match range {
-        RangeExpr::Single(_) => true,
-        RangeExpr::Range(_, _) => false
-    }).unwrap_or(false);
-    let count = if id_is_single { 1 } else { count };
+    let count = if id.is_single() { 1 } else { count };
 
     //println!("type: {:?} count: {:?}", type_, count);
 
     let mut obj = Object::new();
     let con = shared_con.lock().unwrap();
-    let actions = db::query(type_, count, &*con);
+    let actions = db::query(type_, id, count, &*con);
     obj.insert("actions".into(), actions.unwrap().to_json());
 
     {

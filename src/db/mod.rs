@@ -4,6 +4,7 @@ use rusqlite::{SqliteConnection, SqliteResult, SqliteError};
 use rusqlite::types::{FromSql, ToSql, sqlite3_stmt};
 use libc::c_int;
 use model::*;
+use api::{IdExpr, RangeExpr};
 
 mod init;
 
@@ -468,15 +469,43 @@ pub mod presence {
     }
 }
 
-pub fn query(type_: QueryActionType, count: u64, con: &DbCon) -> SqliteResult<Vec<Box<Action>>> {
+pub fn query(type_: QueryActionType, id: RangeExpr<IdExpr>, count: u64, con: &DbCon) -> SqliteResult<Vec<Box<Action>>> {
     let transaction = con.transaction().unwrap();
-    let mut query_str = String::from("SELECT id, type FROM action");
+    let mut query_str = String::from("SELECT id, type FROM action WHERE");
 
     // for livetime reasons we need to define these variables before params:
+    let id1;
+    let id2;
     let count = count as i64;
     let type_int;
 
     let mut params = Vec::<&ToSql>::new();
+
+    match id {
+        RangeExpr::Single(IdExpr::Int(i)) => {
+            id1 = i as i64;
+            query_str.push_str(" id=?");
+            params.push(&id1);
+        },
+        RangeExpr::Single(IdExpr::Last) => {
+            query_str.push_str(" 1");
+        },
+        RangeExpr::Range(IdExpr::Int(i1), IdExpr::Int(i2)) => {
+            id1 = i1 as i64;
+            id2 = i2 as i64;
+            query_str.push_str(" id >= ? AND id <= ?");
+            params.push(&id1);
+            params.push(&id2);
+        },
+        RangeExpr::Range(IdExpr::Int(i1), IdExpr::Last) => {
+            id1 = i1 as i64;
+            query_str.push_str(" id >= ?");
+            params.push(&id1);
+        },
+        RangeExpr::Range(_, _) => {
+            panic!("this case should be unreachable");
+        }
+    }
 
     if type_ != QueryActionType::All {
         type_int = match type_ {
@@ -485,7 +514,7 @@ pub fn query(type_: QueryActionType, count: u64, con: &DbCon) -> SqliteResult<Ve
             QueryActionType::Presence => 2,
             _ => panic!() // impossible
         };
-        query_str.push_str(" WHERE type=?");
+        query_str.push_str(" AND type=?");
         params.push(&type_int);
     }
 
