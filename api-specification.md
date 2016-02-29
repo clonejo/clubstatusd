@@ -69,9 +69,7 @@ The examples below omit the standard members.
 #### Client request:
 ```js
 {
-    "user": "Hans Acker", // UTF-8, 1 to 15 bytes, enclosing whitespace is stripped
-    "api_key": "abc123"   // an authentication key given to you by the status
-                          // admin
+    "user": "Hans Acker"  // UTF-8, 1 to 15 bytes, enclosing whitespace is stripped
 }
 ```
 
@@ -180,13 +178,7 @@ Mandatory members: `type`, `user`, `from`, `to`
 403 you tried to modify the past
 
 ##### Modify announcement
-```js
-{
-    "action": "mod"
-    "aid": 1234
-    // only listed members will be updated.
-}
-```
+Mandatory members: `type`, `aid`, `user`, `from`, `to`  
 200 the updated announcement  
 400 `from` > `to`  
 403 you tried to modify the past  
@@ -204,13 +196,10 @@ Mandatory members: `type`, `user`, `from`, `to`
 404 unknown announcement id
 
 #### PUT Presence
-Mandatory members: `type`, `user`, `api_key`  
+Mandatory members: `type`, `user`  
 The presence times out after 15 minutes. The `note` attribute is ignored.  
-To set presence(s), you need to provide a valid API key. The administritor
-should give you one, but is free to blacklist you if you generate
-false-positives (i.e. users are listed as present when in fact they are not).
-Thus, please make sure you do proper checking (eg. check if your device
-connected to the club wifi/ethernet).
+Please make sure you do proper checking (eg. check if your device connected to
+the club wifi/ethernet).
 
 
 ## Public API
