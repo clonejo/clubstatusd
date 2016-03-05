@@ -127,7 +127,7 @@ All filters/options below can be combined.
 `GET /{action_type}?id={id}`  
 `GET /{action_type}?id={id1}:{id2}`  
 Queries actions by id (range). `id=` deactivates this filter.  
-Special values: `last` and `last-{int}` (eg. `last-5`)  
+Special values: `last`  
 Default: `id=`
 
 #### time filter

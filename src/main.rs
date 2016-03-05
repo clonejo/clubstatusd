@@ -14,6 +14,8 @@ mod model;
 mod db;
 mod api;
 
+mod model_tests;
+
 use clap::{App, Arg};
 use config::types::{Config, SettingsList};
 use std::path::Path;

@@ -2,6 +2,7 @@
 use chrono::*;
 use rustc_serialize::json::{Json, Object, ToJson};
 use db::DbStored;
+use regex::Regex;
 
 #[derive(Debug)]
 pub struct BaseAction {
@@ -245,19 +246,53 @@ fn get_from_to(obj: &Object, now: i64) -> Result<(i64, i64), String> {
     Ok((from, to))
 }
 
-fn parse_time(json: &Json, now: i64) -> Result<i64, String> {
+pub fn parse_time(json: &Json, now: i64) -> Result<i64, String> {
     match json {
         &Json::I64(t) => Ok(t),
         &Json::U64(t) => Ok(t as i64),
         &Json::String(ref s) => {
-            if s == "now" {
-                Ok(now)
-            } else {
-                Err("bad time specification".into())
-            }
+            parse_time_string(s, now)
         },
         _ => Err("bad time specification (wrong type)".into())
     }
+}
+
+fn parse_u64_string(s: &str) -> Result<u64, String> {
+    s.parse::<u64>().map_err(|_| "bad integer".into())
+}
+
+pub fn parse_time_string(s: &str, now: i64) -> Result<i64, String> {
+    match s.parse::<i64>() {
+        Ok(i) => {
+            return Ok(i);
+        },
+        Err(_) => {
+            if s == "now" {
+                return Ok(now);
+            }
+            let re = Regex::new(r"^now([+-])(\d+)$").unwrap();
+            match re.captures(s) {
+                None => {
+                    return Err("bad time specification".into());
+                },
+                Some(captures) => {
+                    let mut i: i64 = try!(parse_u64_string(captures.at(2).unwrap())) as i64;
+                    match captures.at(1) {
+                        Some("+") => {
+                        },
+                        Some("-") => {
+                            i = -i;
+                        },
+                        Some(_) | None => {
+                            panic!("should be impossible");
+                        }
+                    }
+                    return Ok(now + i);
+                }
+            }
+        }
+    }
+    Err("bad time specification".into())
 }
 
 fn get_public(obj: &Object) -> Result<bool, String> {

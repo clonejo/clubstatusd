@@ -4,7 +4,7 @@ use rusqlite::{SqliteConnection, SqliteResult, SqliteError};
 use rusqlite::types::{FromSql, ToSql, sqlite3_stmt};
 use libc::c_int;
 use model::*;
-use api::{IdExpr, RangeExpr};
+use api::{IdExpr, RangeExpr, Take};
 
 mod init;
 
@@ -469,13 +469,16 @@ pub mod presence {
     }
 }
 
-pub fn query(type_: QueryActionType, id: RangeExpr<IdExpr>, count: u64, con: &DbCon) -> SqliteResult<Vec<Box<Action>>> {
+pub fn query(type_: QueryActionType, id: RangeExpr<IdExpr>, time: RangeExpr<i64>,
+             count: u64, take: Take, con: &DbCon) -> SqliteResult<Vec<Box<Action>>> {
     let transaction = con.transaction().unwrap();
     let mut query_str = String::from("SELECT id, type FROM action WHERE");
 
     // for livetime reasons we need to define these variables before params:
     let id1;
     let id2;
+    let time1;
+    let time2;
     let count = count as i64;
     let type_int;
 
@@ -507,6 +510,20 @@ pub fn query(type_: QueryActionType, id: RangeExpr<IdExpr>, count: u64, con: &Db
         }
     }
 
+    match time {
+        RangeExpr::Single(t) => {
+            time1 = t;
+            time2 = t;
+        },
+        RangeExpr::Range(t1, t2) => {
+            time1 = t1;
+            time2 = t2;
+        }
+    };
+    query_str.push_str(" AND \"time\" >= ? AND \"time\" <= ?");
+    params.push(&time1);
+    params.push(&time2);
+
     if type_ != QueryActionType::All {
         type_int = match type_ {
             QueryActionType::Status => 0,
@@ -518,7 +535,12 @@ pub fn query(type_: QueryActionType, id: RangeExpr<IdExpr>, count: u64, con: &Db
         params.push(&type_int);
     }
 
-    query_str.push_str(" ORDER BY id DESC LIMIT ?");
+    query_str.push_str(" ORDER BY id ");
+    query_str.push_str(match take {
+        Take::First => "ASC",
+        Take::Last => "DESC"
+    });
+    query_str.push_str(" LIMIT ?");
     params.push(&count);
 
     let mut stmt = con.prepare(&query_str[..]).unwrap();
@@ -533,7 +555,9 @@ pub fn query(type_: QueryActionType, id: RangeExpr<IdExpr>, count: u64, con: &Db
         }
     });
     let mut actions: Vec<Box<Action>> = actions_iter.collect();
-    actions.reverse();
+    if take == Take::Last {
+        actions.reverse();
+    }
     transaction.commit().unwrap();
     Ok(actions)
 }

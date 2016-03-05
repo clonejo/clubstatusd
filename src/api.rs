@@ -11,7 +11,7 @@ use rustc_serialize::json::{Json, Object, ToJson};
 use std::sync::{Arc, Mutex};
 use std::io::Read;
 use std::sync::mpsc::Sender;
-use model::{json_to_object, QueryActionType, RequestObject};
+use model::{json_to_object, QueryActionType, RequestObject, parse_time_string};
 use hyper::server::{Server, Request, Response};
 use hyper::header;
 use hyper::uri::RequestUri;
@@ -316,6 +316,13 @@ impl<T: PartialOrd> RangeExpr<T> {
             &RangeExpr::Range(_, _) => false
         }
     }
+
+    fn map<F, R, E>(&self, f: F) -> Result<RangeExpr<R>, E> where F: Fn(&T) -> Result<R, E> {
+        Ok(match self {
+            &RangeExpr::Single(ref first) => RangeExpr::Single(try!(f(first))),
+            &RangeExpr::Range(ref first, ref second) => RangeExpr::Range(try!(f(first)), try!(f(second)))
+        })
+    }
 }
 
 impl<T: FromStr+PartialOrd> FromStr for RangeExpr<T> {
@@ -347,8 +354,8 @@ impl PartialOrd for IdExpr {
 
         match (self, other) {
             (&Int(i1), &Int(i2)) => i1.partial_cmp(&i2),
-            (&Int(i1), &Last) => Some(Ordering::Less),
-            (&Last, &Int(i2)) => Some(Ordering::Greater),
+            (&Int(_), &Last) => Some(Ordering::Less),
+            (&Last, &Int(_)) => Some(Ordering::Greater),
             (&Last, &Last) => Some(Ordering::Equal)
         }
     }
@@ -367,6 +374,12 @@ impl FromStr for IdExpr {
             }
         }
     }
+}
+
+#[derive(Debug, PartialEq)]
+pub enum Take {
+    First,
+    Last
 }
 
 fn query(pr: ParsedRequest, mut res: Response, shared_con: Arc<Mutex<DbCon>>,
@@ -401,6 +414,28 @@ fn query(pr: ParsedRequest, mut res: Response, shared_con: Arc<Mutex<DbCon>>,
             }
         }
     };
+    let time: RangeExpr<i64> = match get_params.get("time") {
+        None => RangeExpr::range(i64::min_value(), i64::max_value()),
+        Some(&None) => RangeExpr::range(i64::min_value(), i64::max_value()),
+        Some(&Some(ref s)) => {
+            match s.parse::<RangeExpr<String>>() {
+                Ok(t) => {
+                    let now = UTC::now().timestamp();
+                    match t.map(|s| parse_time_string(&*s, now)) {
+                        Ok(m) => m,
+                        Err(_) => {
+                            send(res, StatusCode::BadRequest, "bad parameter: time".as_bytes());
+                            return;
+                        }
+                    }
+                },
+                Err(_) => {
+                    send(res, StatusCode::BadRequest, "bad parameter: time".as_bytes());
+                    return;
+                }
+            }
+        }
+    };
     let count = match get_params.get("count") {
         None => 20,
         Some(&None) => 20,
@@ -416,12 +451,26 @@ fn query(pr: ParsedRequest, mut res: Response, shared_con: Arc<Mutex<DbCon>>,
     };
     let count: u64 = min(count, 100);
     let count = if id.is_single() { 1 } else { count };
+    let take = match get_params.get("take") {
+        None => Take::Last,
+        Some(&None) => Take::Last,
+        Some(&Some(ref s)) => {
+            match &**s {
+                "first" => Take::First,
+                "last" => Take::Last,
+                _ => {
+                    send(res, StatusCode::BadRequest, "bad parameter: take".as_bytes());
+                    return;
+                }
+            }
+        }
+    };
 
-    //println!("type: {:?} count: {:?}", type_, count);
+    //println!("type: {:?} id: {:?} time: {:?} count: {:?} take: {:?}", type_, id, time, count, take);
 
     let mut obj = Object::new();
     let con = shared_con.lock().unwrap();
-    let actions = db::query(type_, id, count, &*con);
+    let actions = db::query(type_, id, time, count, take, &*con);
     obj.insert("actions".into(), actions.unwrap().to_json());
 
     {
