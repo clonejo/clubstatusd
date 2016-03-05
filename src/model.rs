@@ -77,15 +77,7 @@ impl ToJson for Status {
 }
 
 impl StatusAction {
-    pub fn new(note: String, user: String, status: Status) -> Self {
-        StatusAction {
-            action: BaseAction::new(note),
-            user: user,
-            status: status
-        }
-    }
-
-    pub fn new_with_time(note: String, time: i64, user: String, status: Status) -> Self {
+    pub fn new(note: String, time: i64, user: String, status: Status) -> Self {
         StatusAction {
             action: BaseAction::new_with_time(note, time),
             user: user,
@@ -170,15 +162,6 @@ impl PresenceAction {
 pub struct PresentUser {
     pub name: String,
     pub since: i64
-}
-
-impl PresentUser {
-    pub fn new(name: String) -> Self {
-        PresentUser {
-            name: name,
-            since: UTC::now().timestamp()
-        }
-    }
 }
 
 impl ToJson for PresentUser {
