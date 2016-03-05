@@ -383,7 +383,8 @@ pub mod presence {
         let users_iter = stmt.query_map(&[&(action.id.unwrap() as i64)], |row| {
             PresentUser{name: row.get(0), since: row.get(1)}
         }).unwrap();
-        let users = users_iter.map(|user| { user.unwrap() }).collect();
+        let mut users: Vec<PresentUser> = users_iter.map(|user| { user.unwrap() }).collect();
+        users.sort_by_key(|u| u.name.clone());
         Ok(
             PresenceAction{
                 action: action,
