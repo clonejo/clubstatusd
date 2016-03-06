@@ -427,10 +427,44 @@ pub mod presence {
                 since: i64,
                 last_seen: i64
             }
+            let last_action = {
+                let con = shared_con.lock().unwrap();
+                get_last(&*con).unwrap()
+            };
             let mut users: HashMap<String, UserPresence> = HashMap::new();
+            for user in last_action.users {
+                users.insert(user.name, UserPresence{
+                    since: user.since,
+                    last_seen: last_action.action.time
+                });
+            }
+            let mut now = UTC::now().timestamp();
             loop {
+                // scrape timeouted users
+                let new_users: HashMap<String, UserPresence> =
+                    HashMap::from_iter(users.drain().filter(|&(_, ref presence)| {
+                        // presence requests time out after 11min + time slept
+                        // a presence request makes the user present in the next two presence
+                        // actions
+                        presence.last_seen + 11*60 >= now
+                    }));
+                users = new_users;
+                let mut present_users = Vec::new();
+                for (username, presence) in users.iter() {
+                    present_users.push(PresentUser{name: username.clone(), since: presence.since});
+                }
+
+                // create action
+                {
+                    let con = shared_con.lock().unwrap();
+                    let mut presence_action = PresenceAction::new(String::from(""), present_users);
+                    presence_action.store(&*con);
+                }
+
                 thread::sleep(Duration::new(10*60, 0)); // create one presence action every 10min
-                let now = UTC::now().timestamp();
+
+                // add requests to user list
+                now = UTC::now().timestamp();
                 loop {
                     match rx.try_recv() {
                         Ok(username) => {
@@ -445,24 +479,6 @@ pub mod presence {
                             return;
                         }
                     }
-                }
-                let new_users: HashMap<String, UserPresence> =
-                    HashMap::from_iter(users.drain().filter(|&(_, ref presence)| {
-                        // presence requests time out after 11min + time slept
-                        // a presence request makes the user present in the next two presence
-                        // actions
-                        presence.last_seen + 11*60 >= now
-                    }));
-                users = new_users;
-                let mut present_users = Vec::new();
-                for (username, presence) in users.iter() {
-                    present_users.push(PresentUser{name: username.clone(), since: presence.since});
-                }
-
-                {
-                    let con = shared_con.lock().unwrap();
-                    let mut presence_action = PresenceAction::new(String::from(""), present_users);
-                    presence_action.store(&*con);
                 }
             }
         });
