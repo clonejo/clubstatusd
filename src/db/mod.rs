@@ -443,10 +443,10 @@ pub mod presence {
                 // scrape timeouted users
                 let new_users: HashMap<String, UserPresence> =
                     HashMap::from_iter(users.drain().filter(|&(_, ref presence)| {
-                        // presence requests time out after 11min + time slept
+                        // presence requests time out after 15min + time slept
                         // a presence request makes the user present in the next two presence
                         // actions
-                        presence.last_seen + 11*60 >= now
+                        presence.last_seen + 15*60 >= now
                     }));
                 users = new_users;
                 let mut present_users = Vec::new();
@@ -461,7 +461,7 @@ pub mod presence {
                     presence_action.store(&*con);
                 }
 
-                thread::sleep(Duration::new(10*60, 0)); // create one presence action every 10min
+                thread::sleep(Duration::new(20, 0)); // create one presence action every 20s
 
                 // add requests to user list
                 now = UTC::now().timestamp();
