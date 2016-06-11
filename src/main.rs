@@ -10,6 +10,11 @@ extern crate rustc_serialize;
 extern crate rusqlite;
 extern crate urlparse;
 
+extern crate mqttc;
+extern crate netopt;
+
+extern crate time;
+
 mod model;
 mod db;
 mod api;
@@ -20,6 +25,7 @@ use clap::{App, Arg};
 use config::types::{Config, SettingsList};
 use std::path::Path;
 use std::io::{stderr, Write};
+use std::sync::{Arc, Mutex};
 
 fn main() {
     let arg_matches = App::new("clubstatusd")
@@ -58,7 +64,16 @@ fn main() {
                     None
                 }
             };
-            api::run(con, conf.lookup_str_or("listen", "localhost:8000"), password);
+
+            let shared_con = Arc::new(Mutex::new(con));
+
+            let mqtt_server = conf.lookup_str("mqtt.server").map(|s| String::from(s));
+            let mqtt_topic_prefix = String::from(conf.lookup_str_or("mqtt.topic_prefix", ""));
+            let mqtt_handler = db::mqtt::start_handler(mqtt_server, mqtt_topic_prefix,
+                                                       shared_con.clone());
+
+            let listen_addr = conf.lookup_str_or("listen", "localhost:8000");
+            api::run(shared_con, listen_addr, password, mqtt_handler);
         },
         Err(err) => {
             writeln!(&mut stderr(),

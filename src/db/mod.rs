@@ -5,8 +5,10 @@ use rusqlite::types::{FromSql, ToSql, sqlite3_stmt};
 use libc::c_int;
 use model::*;
 use api::{IdExpr, RangeExpr, Take};
+use std::sync::mpsc::Sender;
 
 mod init;
+pub mod mqtt;
 
 pub use db::init::ensure_initialized;
 
@@ -19,7 +21,7 @@ pub fn connect(path_str: &str) -> Result<DbCon, SqliteError> {
 }
 
 pub trait DbStored {
-    fn store(&mut self, con: &DbCon) -> Option<u64>;
+    fn store(&mut self, con: &DbCon, mqtt: &Option<Sender<TypedAction>>) -> Option<u64>;
 }
 
 pub trait DbStoredTyped {
@@ -40,7 +42,7 @@ impl DbStoredTyped for BaseAction {
  */
 
 impl DbStored for StatusAction {
-    fn store(&mut self, con: &DbCon) -> Option<u64> {
+    fn store(&mut self, con: &DbCon, mqtt: &Option<Sender<TypedAction>>) -> Option<u64> {
         match self.action.id {
             None => {
                 let transaction = con.transaction().unwrap();
@@ -66,6 +68,12 @@ impl DbStored for StatusAction {
                               &(changed as i64), &(public_changed as i64)]).unwrap();
                 self.action.id = Some(action_id);
                 transaction.commit().unwrap();
+                match mqtt {
+                    &Some(ref m) => {
+                        m.send(TypedAction::Status(self.clone())).unwrap();
+                    },
+                    &None => {}
+                }
                 Some(action_id)
             },
             Some(_) =>
@@ -152,7 +160,8 @@ pub mod status {
  */
 
 impl DbStored for AnnouncementAction {
-    fn store(&mut self, con: &SqliteConnection) -> Option<u64> {
+    fn store(&mut self, con: &SqliteConnection, _mqtt: &Option<Sender<TypedAction>>)
+        -> Option<u64> {
         match self.action.id {
             None => {
                 match self.method {
@@ -337,7 +346,8 @@ pub mod announcements {
  */
 
 impl DbStored for PresenceAction {
-    fn store(&mut self, con: &SqliteConnection) -> Option<u64> {
+    fn store(&mut self, con: &SqliteConnection, mqtt: &Option<Sender<TypedAction>>)
+        -> Option<u64> {
         match self.action.id {
             None => {
                 let transaction = con.transaction().unwrap();
@@ -345,11 +355,19 @@ impl DbStored for PresenceAction {
                             &[&self.action.time, &2, &self.action.note]).unwrap();
                 let action_id = con.last_insert_rowid() as u64;
                 for user in self.users.iter() {
-                    con.execute("INSERT INTO presence_action (id, user, since) VALUES (?, ?, ?)",
-                                &[&(action_id as i64), &user.name, &user.since]).unwrap();
+                    if user.status != PresentUserStatus::Left {
+                        con.execute("INSERT INTO presence_action (id, user, since) VALUES (?, ?, ?)",
+                                    &[&(action_id as i64), &user.name, &user.since]).unwrap();
+                    }
                 }
                 self.action.id = Some(action_id);
                 transaction.commit().unwrap();
+                match mqtt {
+                    &Some(ref m) => {
+                        m.send(TypedAction::Presence(self.clone())).unwrap();
+                    },
+                    &None => {}
+                }
                 Some(action_id)
             },
             Some(_) =>
@@ -381,7 +399,7 @@ pub mod presence {
     fn get_by_base_action(action: BaseAction, con: &DbCon) -> SqliteResult<PresenceAction> {
         let mut stmt = con.prepare("SELECT user, since FROM presence_action WHERE id = ?").unwrap();
         let users_iter = stmt.query_map(&[&(action.id.unwrap() as i64)], |row| {
-            PresentUser{name: row.get(0), since: row.get(1)}
+            PresentUser{name: row.get(0), since: row.get(1), status: PresentUserStatus::Present}
         }).unwrap();
         let mut users: Vec<PresentUser> = users_iter.map(|user| { user.unwrap() }).collect();
         users.sort_by_key(|u| u.name.clone());
@@ -419,50 +437,73 @@ pub mod presence {
         }
     }
 
-    pub fn start_tracker(shared_con: Arc<Mutex<DbCon>>) -> Sender<String> {
+    pub fn start_tracker(shared_con: Arc<Mutex<DbCon>>, mqtt: Option<Sender<TypedAction>>)
+        -> Sender<String> {
+
         let (tx, rx) = channel::<String>();
         thread::spawn(move || {
             #[derive(Debug)]
             struct UserPresence {
                 since: i64,
-                last_seen: i64
+                last_seen: i64,
+                status: PresentUserStatus
             }
             let last_action = {
                 let con = shared_con.lock().unwrap();
                 get_last(&*con).unwrap()
             };
+            let mut now = UTC::now().timestamp();
             let mut users: HashMap<String, UserPresence> = HashMap::new();
             for user in last_action.users {
                 users.insert(user.name, UserPresence{
                     since: user.since,
-                    last_seen: last_action.action.time
+                    last_seen: now,
+                    status: PresentUserStatus::Present
                 });
             }
-            let mut now = UTC::now().timestamp();
             let mut changed = false;
             loop {
-                // scrape timeouted users
+                // scrape users with status=left
                 let new_users: HashMap<String, UserPresence> =
                     HashMap::from_iter(users.drain().filter(|&(_, ref presence)| {
-                        // presence requests time out after 15min + time slept
-                        let keep = presence.last_seen + 15*60 >= now;
+                        let keep = presence.status != PresentUserStatus::Left;
                         if !keep {
                             changed = true;
                         }
                         keep
                     }));
                 users = new_users;
-                let mut present_users = Vec::new();
-                for (username, presence) in users.iter() {
-                    present_users.push(PresentUser{name: username.clone(), since: presence.since});
+
+                // presence requests time out after 15min + time slept
+                // set these users' status to left
+                for (ref _user, ref mut presence) in users.iter_mut() { // use values_mut() when stable
+                    if presence.last_seen + 15*60 <= now {
+                        presence.status = PresentUserStatus::Left;
+                        changed = true;
+                    }
                 }
 
                 // create action
+                let mut present_users = Vec::new();
+                for (username, presence) in users.iter() {
+                    present_users.push(PresentUser {
+                        name: username.clone(), since: presence.since,
+                        status: presence.status.clone()
+                    });
+                }
                 if changed {
                     let con = shared_con.lock().unwrap();
                     let mut presence_action = PresenceAction::new(String::from(""), present_users);
-                    presence_action.store(&*con);
+                    presence_action.store(&*con, &mqtt);
                     changed = false;
+                }
+
+                // switch users with status=joined to present
+                for (ref _user, ref mut presence) in users.iter_mut() { // use values_mut() when stable
+                    if presence.status == PresentUserStatus::Joined {
+                        presence.status = PresentUserStatus::Present;
+                        changed = true;
+                    }
                 }
 
                 thread::sleep(Duration::new(20, 0)); // create one presence action every 20s
@@ -472,11 +513,14 @@ pub mod presence {
                 loop {
                     match rx.try_recv() {
                         Ok(username) => {
-                            if !users.contains_key(&username) {
-                                changed = true;
-                            }
-                            let mut presence = users.entry(username).or_insert(
-                                UserPresence{since: now, last_seen: now});
+                            let mut presence = users.entry(username).or_insert_with(
+                                || {
+                                    changed = true;
+                                    UserPresence{
+                                        since: now, last_seen: now,
+                                        status: PresentUserStatus::Joined
+                                    }
+                                });
                             presence.last_seen = now;
                         },
                         Err(TryRecvError::Empty) => {

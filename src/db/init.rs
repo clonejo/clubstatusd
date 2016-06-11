@@ -73,11 +73,11 @@ con.execute("CREATE TABLE presence_action (
 fn insert_initial_status(con: &SqliteConnection) {
     let mut status_action = StatusAction::new(
         "initial state".into(), 0, "Hans Acker".into(), Status::Closed);
-    status_action.store(con).unwrap();
+    status_action.store(con, &None).unwrap();
 }
 
 fn insert_initial_presence(con: &SqliteConnection) {
     let mut presence_action = PresenceAction::new_with_time(
         "initial state".into(), 0, vec![]);
-    presence_action.store(con).unwrap();
+    presence_action.store(con, &None).unwrap();
 }

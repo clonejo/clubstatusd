@@ -11,7 +11,7 @@ use rustc_serialize::json::{Json, Object, ToJson};
 use std::sync::{Arc, Mutex};
 use std::io::Read;
 use std::sync::mpsc::Sender;
-use model::{json_to_object, QueryActionType, RequestObject, parse_time_string};
+use model::{json_to_object, QueryActionType, RequestObject, parse_time_string, TypedAction};
 use hyper::server::{Server, Request, Response};
 use hyper::header;
 use hyper::uri::RequestUri;
@@ -23,14 +23,17 @@ use chrono::UTC;
 
 trait Handler: Sync + Send + Any {
     fn handle(&self, pr: ParsedRequest, res: Response, con: Arc<Mutex<DbCon>>,
-              presence_tracker: Arc<Mutex<Sender<String>>>);
+              presence_tracker: Arc<Mutex<Sender<String>>>,
+              mqtt: Arc<Mutex<Option<Sender<TypedAction>>>>);
 }
 
 impl<F> Handler for F
-where F: Send + Sync + Any + Fn(ParsedRequest, Response, Arc<Mutex<DbCon>>, Arc<Mutex<Sender<String>>>) {
+where F: Send + Sync + Any + Fn(ParsedRequest, Response, Arc<Mutex<DbCon>>, Arc<Mutex<Sender<String>>>,
+                                Arc<Mutex<Option<Sender<TypedAction>>>>) {
     fn handle(&self, pr: ParsedRequest, res: Response, con: Arc<Mutex<DbCon>>,
-              presence_tracker: Arc<Mutex<Sender<String>>>) {
-        (*self)(pr, res, con, presence_tracker);
+              presence_tracker: Arc<Mutex<Sender<String>>>,
+              mqtt: Arc<Mutex<Option<Sender<TypedAction>>>>) {
+        (*self)(pr, res, con, presence_tracker, mqtt);
     }
 }
 
@@ -43,11 +46,12 @@ struct ParsedRequest<'a, 'b: 'a> {
     authenticated: bool
 }
 
-pub fn run(con: DbCon, listen: &str, password: Option<&str>) {
-    let shared_con = Arc::new(Mutex::new(con));
+pub fn run(shared_con: Arc<Mutex<DbCon>>, listen: &str, password: Option<&str>,
+           mqtt: Option<Sender<TypedAction>>) {
     let password = password.map(|s| String::from(s));
 
-    let presence_tracker = Arc::new(Mutex::new(db::presence::start_tracker(shared_con.clone())));
+    let mqtt_arc = Arc::new(Mutex::new(mqtt.clone()));
+    let presence_tracker = Arc::new(Mutex::new(db::presence::start_tracker(shared_con.clone(), mqtt.clone())));
 
     let mut router: Router<(Method, Box<Handler>)> = Router::new();
     router.add("/api/versions", (Method::Get, Box::new(api_versions)));
@@ -77,7 +81,7 @@ pub fn run(con: DbCon, listen: &str, password: Option<&str>) {
                         get_params_str: get_params_string,
                         authenticated: authenticated
                     };
-                    handler.handle(pr, res, shared_con.clone(), presence_tracker.clone());
+                    handler.handle(pr, res, shared_con.clone(), presence_tracker.clone(), mqtt_arc.clone());
                 } else {
                     send_status(res, StatusCode::MethodNotAllowed);
                 }
@@ -162,7 +166,7 @@ fn send(mut res: Response, status: StatusCode, msg: &[u8]) {
 }
 
 fn api_versions(_pr: ParsedRequest, mut res: Response, _shared_con: Arc<Mutex<DbCon>>,
-                _: Arc<Mutex<Sender<String>>>) {
+                _: Arc<Mutex<Sender<String>>>, _: Arc<Mutex<Option<Sender<TypedAction>>>>) {
     let mut obj = Object::new();
     obj.insert("versions".into(), [0].to_json());
     {
@@ -179,7 +183,8 @@ fn api_versions(_pr: ParsedRequest, mut res: Response, _shared_con: Arc<Mutex<Db
  * PUT
  */
 fn create_action(mut pr: ParsedRequest, mut res: Response, shared_con: Arc<Mutex<DbCon>>,
-                 presence_tracker: Arc<Mutex<Sender<String>>>) {
+                 presence_tracker: Arc<Mutex<Sender<String>>>,
+                 mqtt: Arc<Mutex<Option<Sender<TypedAction>>>>) {
     if !pr.authenticated {
         send_unauthorized(res);
         return;
@@ -197,7 +202,7 @@ fn create_action(mut pr: ParsedRequest, mut res: Response, shared_con: Arc<Mutex
             match json_to_object(action_json, now) {
                 Ok(RequestObject::Action(mut action)) => {
                     let con = shared_con.lock().unwrap();
-                    match action.store(&*con) {
+                    match action.store(&*con, &*mqtt.lock().unwrap()) {
                         Some(action_id) => {
                             {
                                 let headers = res.headers_mut();
@@ -227,7 +232,7 @@ fn create_action(mut pr: ParsedRequest, mut res: Response, shared_con: Arc<Mutex
  * GET
  */
 fn status_current(pr: ParsedRequest, mut res: Response, shared_con: Arc<Mutex<DbCon>>,
-                  _: Arc<Mutex<Sender<String>>>) {
+                  _: Arc<Mutex<Sender<String>>>, _: Arc<Mutex<Option<Sender<TypedAction>>>>) {
     let get_params = parse_get_params(pr.get_params_str);
     let public_api = get_params.contains_key("public");
     if !public_api && !pr.authenticated {
@@ -263,7 +268,7 @@ fn status_current(pr: ParsedRequest, mut res: Response, shared_con: Arc<Mutex<Db
 }
 
 fn announcement_current(pr: ParsedRequest, mut res: Response, shared_con: Arc<Mutex<DbCon>>,
-                        _: Arc<Mutex<Sender<String>>>) {
+                        _: Arc<Mutex<Sender<String>>>, _: Arc<Mutex<Option<Sender<TypedAction>>>>) {
     let get_params = parse_get_params(pr.get_params_str);
     let public_api = get_params.contains_key("public");
     if !public_api && !pr.authenticated {
@@ -383,7 +388,7 @@ pub enum Take {
 }
 
 fn query(pr: ParsedRequest, mut res: Response, shared_con: Arc<Mutex<DbCon>>,
-         _: Arc<Mutex<Sender<String>>>) {
+         _: Arc<Mutex<Sender<String>>>, _: Arc<Mutex<Option<Sender<TypedAction>>>>) {
     if !pr.authenticated {
         send_unauthorized(res);
         return;

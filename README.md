@@ -6,6 +6,8 @@ people announcing their future stay) and presence (people currently staying).
 
 What data the daemon tracks and how the API looks is documented in the [Specification](api-specification.md).
 
+As of 0.2.0 clubstatusd can publish status and presence changes via MQTT.
+
 # Dependencies
 * Rust and Cargo
 * GCC

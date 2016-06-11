@@ -1,6 +1,6 @@
 [package]
 name = "clubstatusd"
-version = "0.1.0"
+version = "0.2.0"
 authors = ["clonejo <clonejo@shakik.de>"]
 
 [dependencies]
@@ -14,4 +14,6 @@ hyper = "*"
 regex = "0.1"
 route-recognizer = "0.1"
 urlparse = "^0.7"
-
+mqttc = "^0.1.2"
+netopt = "^0.1.2"
+time = "^0.1"

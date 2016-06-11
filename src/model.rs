@@ -4,7 +4,7 @@ use rustc_serialize::json::{Json, Object, ToJson};
 use db::DbStored;
 use regex::Regex;
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct BaseAction {
     pub id: Option<u64>,
     pub time: i64,
@@ -33,7 +33,7 @@ impl BaseAction {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum QueryActionType {
     Status,
     Announcement,
@@ -41,14 +41,14 @@ pub enum QueryActionType {
     All
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct StatusAction {
     pub action: BaseAction,
     pub user: String,
     pub status: Status
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum Status {
     Public,
     Private,
@@ -97,7 +97,7 @@ impl ToJson for StatusAction {
     }
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct AnnouncementAction {
     pub action: BaseAction,
     pub method: AnnouncementMethod,
@@ -108,7 +108,7 @@ pub struct AnnouncementAction {
     pub public: bool
 }
 
-#[derive(Debug,PartialEq)]
+#[derive(Clone, Debug,PartialEq)]
 pub enum AnnouncementMethod {
     New,
     Mod,
@@ -139,7 +139,7 @@ impl ToJson for AnnouncementAction {
     }
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct PresenceAction {
     pub action: BaseAction,
     pub users: Vec<PresentUser>
@@ -158,10 +158,18 @@ impl PresenceAction {
     }
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct PresentUser {
     pub name: String,
-    pub since: i64
+    pub since: i64,
+    pub status: PresentUserStatus
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub enum PresentUserStatus {
+    Joined,
+    Present,
+    Left
 }
 
 impl ToJson for PresentUser {
@@ -176,7 +184,14 @@ impl ToJson for PresenceAction {
     fn to_json(&self) -> Json {
         let mut obj = self.action.to_json_obj();
         obj.insert("type".into(), "presence".to_json());
-        obj.insert("users".into(), self.users.to_json());
+        let json_users: Vec<Json> = self.users.iter().filter_map(|ref user| {
+            if user.status == PresentUserStatus::Left {
+                None
+            } else {
+                Some(user.to_json())
+            }
+        }).collect();
+        obj.insert("users".into(), json_users.to_json());
         Json::Object(obj)
     }
 }
@@ -192,6 +207,12 @@ impl Action for AnnouncementAction {
 }
 impl Action for PresenceAction {
     fn get_base_action<'a>(&'a self) -> &'a BaseAction { &self.action }
+}
+
+pub enum TypedAction {
+    Status(StatusAction),
+    Announcement(AnnouncementAction),
+    Presence(PresenceAction)
 }
 
 impl ToJson for Box<Action> {
