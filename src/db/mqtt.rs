@@ -5,7 +5,8 @@ use std::thread;
 use std::time::Duration;
 use time;
 
-use mqttc::{Client, ClientOptions, ReconnectMethod, PubOpt, Mqttc};
+use mqtt3::QoS;
+use mqttc::{Client, ClientOptions, ReconnectMethod, PubOpt, PubSub};
 use netopt::NetworkOptions;
 
 use model::*;
@@ -17,15 +18,14 @@ fn publish_status(action: &StatusAction, client: &mut Client, topic_prefix: &str
         Status::Private => "private",
         Status::Closed => "closed"
     };
-    client.publish(
-        format!("{}status", topic_prefix), payload,
-        PubOpt::at_most_once()).unwrap();
+    let pubopt = PubOpt::new(QoS::AtLeastOnce, true);
+    client.publish(format!("{}status", topic_prefix), payload, pubopt).unwrap();
 }
 
 fn publish_announcement(_action: &AnnouncementAction, client: &mut Client, topic_prefix: &str) {
         client.publish(
             format!("{}announcement", topic_prefix), "not_implemented",
-            PubOpt::at_most_once()).unwrap();
+            PubOpt::at_least_once()).unwrap();
 }
 
 fn publish_presence<'a>(action: &'a PresenceAction, client: &mut Client, topic_prefix: &str) {
@@ -38,9 +38,8 @@ fn publish_presence<'a>(action: &'a PresenceAction, client: &mut Client, topic_p
         }).collect();
     users.sort();
     let users_string: String = users.join(",");
-    client.publish(
-        format!("{}presence/list", topic_prefix), users_string,
-        PubOpt::at_most_once()).unwrap();
+    let pubopt = PubOpt::new(QoS::AtLeastOnce, true);
+    client.publish(format!("{}presence/list", topic_prefix), users_string, pubopt).unwrap();
     for user in action.users.iter() {
         let status_str = match user.status {
             PresentUserStatus::Joined  => "joined",
@@ -59,11 +58,12 @@ pub fn start_handler(server: Option<String>, topic_prefix: String, shared_con: A
     let (tx, rx) = channel::<TypedAction>();
     match server {
         Some(server_str) => {
-            thread::spawn(move || {
+            thread::Builder::new().name(String::from("mqtt_client")).spawn(move || {
                 let netopt = NetworkOptions::new();
                 let mut opts = ClientOptions::new();
                 opts.set_reconnect(ReconnectMethod::ReconnectAfter(Duration::from_secs(5)));
-                let mut client = opts.connect(&*server_str, netopt).unwrap();
+                let mut client =
+                    opts.connect(&*server_str, netopt).expect("could not connect to mqtt server");
                 println!("connected to mqtt server");
 
                 let last_status = {
@@ -103,7 +103,7 @@ pub fn start_handler(server: Option<String>, topic_prefix: String, shared_con: A
                     }
                     thread::sleep(Duration::new(2, 0));
                 }
-            });
+            }).unwrap();
             Some(tx)
         },
         None => {

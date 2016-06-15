@@ -10,6 +10,7 @@ extern crate rustc_serialize;
 extern crate rusqlite;
 extern crate urlparse;
 
+extern crate mqtt3;
 extern crate mqttc;
 extern crate netopt;
 

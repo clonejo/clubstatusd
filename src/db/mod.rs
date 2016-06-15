@@ -441,7 +441,7 @@ pub mod presence {
         -> Sender<String> {
 
         let (tx, rx) = channel::<String>();
-        thread::spawn(move || {
+        thread::Builder::new().name(String::from("presence_tracker")).spawn(move || {
             #[derive(Debug)]
             struct UserPresence {
                 since: i64,
@@ -532,7 +532,7 @@ pub mod presence {
                     }
                 }
             }
-        });
+        }).unwrap();
         tx
     }
 }
