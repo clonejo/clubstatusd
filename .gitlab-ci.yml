@@ -8,5 +8,5 @@ job:
   script:
     - uname -a
     - DEBIAN_FRONTEND=noninteractive apt-get update -y
-    - DEBIAN_FRONTEND=noninteractive apt-get install -y gcc openssl libssl-dev sqlite3 libsqlite3-dev
+    - DEBIAN_FRONTEND=noninteractive apt-get install -y gcc openssl libssl-dev sqlite3 libsqlite3-dev pkg-config
     - RUST_BACKTRACE=1 cargo build --release
