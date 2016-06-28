@@ -9,4 +9,4 @@ job:
     - uname -a
     - DEBIAN_FRONTEND=noninteractive apt-get update -y
     - DEBIAN_FRONTEND=noninteractive apt-get install -y gcc openssl libssl-dev sqlite3 libsqlite3-dev
-    - cargo build --release
+    - RUST_BACKTRACE=1 cargo build --release
