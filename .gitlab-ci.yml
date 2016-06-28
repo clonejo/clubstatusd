@@ -1,0 +1,12 @@
+image: schickling/rust
+
+stages:
+  - build
+
+job:
+  stage: build
+  script:
+    - uname -a
+    - DEBIAN_FRONTEND=noninteractive apt-get update -y
+    - DEBIAN_FRONTEND=noninteractive apt-get install -y openssl libssl-dev sqlite3-0 sqlite3-dev
+    - cargo build --release
