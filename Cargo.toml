@@ -18,3 +18,10 @@ mqtt3 = "^0.1.2"
 mqttc = "^0.1.2"
 netopt = "^0.1.2"
 time = "^0.1"
+
+[profile.release]
+opt-level = 3
+rpath = false
+lto = true
+debug-assertions = false
+codegen-units = 1

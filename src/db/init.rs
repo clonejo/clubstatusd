@@ -7,6 +7,7 @@ use db::DbStored;
 pub fn ensure_initialized(path: &Path) -> Result<(), SqliteError> {
     match fs::metadata(path) {
         Err(_) => {
+            println!("creating db at {:?}", path);
             let con = try!(SqliteConnection::open(path));
             create_tables(&con);
             insert_initial_status(&con);
