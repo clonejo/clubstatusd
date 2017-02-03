@@ -6,14 +6,10 @@ extern crate hyper;
 extern crate libc;
 extern crate regex;
 extern crate route_recognizer;
+extern crate rumqtt;
 extern crate rustc_serialize;
 extern crate rusqlite;
 extern crate urlparse;
-
-extern crate mqtt3;
-extern crate mqttc;
-extern crate netopt;
-
 extern crate time;
 
 mod model;
