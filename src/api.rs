@@ -19,7 +19,7 @@ use hyper::method::Method;
 use hyper::status::StatusCode;
 use route_recognizer::{Router, Match, Params};
 use urlparse;
-use chrono::UTC;
+use chrono::{UTC, Datelike, TimeZone};
 
 trait Handler: Sync + Send + Any {
     fn handle(&self, pr: ParsedRequest, res: Response, con: Arc<Mutex<DbCon>>,
@@ -60,7 +60,7 @@ pub fn run(shared_con: Arc<Mutex<DbCon>>, listen: &str, password: Option<&str>,
     router.add("/api/v0/status/current", (Method::Get, Box::new(status_current)));
     router.add("/api/v0/announcement/current", (Method::Get, Box::new(announcement_current)));
 
-    Server::http(listen).unwrap().handle(move |req: Request, res: Response| {
+    Server::http(listen).unwrap().handle(move |req: Request, mut res: Response| {
         let (match_result, get_params_string) = {
             let uri_str = match req.uri {
                 RequestUri::AbsolutePath(ref p) => p,
@@ -73,6 +73,7 @@ pub fn run(shared_con: Arc<Mutex<DbCon>>, listen: &str, password: Option<&str>,
             Ok(Match{ handler: tup, params }) => {
                 let &(ref method, ref handler): &(Method, Box<Handler>) = tup;
                 let authenticated = check_authentication(&req, &password);
+                set_auth_cookie(&mut res, &password);
                 if *method == req.method {
                     let pr = ParsedRequest {
                         req: req,
@@ -115,6 +116,12 @@ fn check_authentication(req: &Request, password: &Option<String>) -> bool {
     match *password {
         None => true,
         Some(ref pass_str) => {
+            if let Some(cookies) = req.headers.get::<header::Cookie>() {
+                let correct_cookie = format!("clubstatusd-password={}", pass_str);
+                if cookies.iter().any(|&ref c| c == correct_cookie.as_str()) {
+                    return true;
+                }
+            }
             match req.headers.get::<header::Authorization<header::Basic>>() {
                 Some(&header::Authorization(header::Basic {
                     username: _,
@@ -124,6 +131,20 @@ fn check_authentication(req: &Request, password: &Option<String>) -> bool {
                 },
                 _ => false
             }
+        }
+    }
+}
+
+fn set_auth_cookie(res: &mut Response, password: &Option<String>) {
+    match *password {
+        None => {},
+        Some(ref pass_str) => {
+            // cookie expires in 1 to 2 years
+            let expiration_year = UTC::today().year() + 2;
+            let expire_time = UTC.ymd(expiration_year, 1, 1).and_hms(0, 0, 0).format("%a, %m %b %Y %H:%M:%S GMT");
+            res.headers_mut().set(header::SetCookie(vec![
+                                            format!("clubstatusd-password={}; Path=/; Expires={}", pass_str, expire_time)
+            ]));
         }
     }
 }
