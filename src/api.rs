@@ -73,7 +73,9 @@ pub fn run(shared_con: Arc<Mutex<DbCon>>, listen: &str, password: Option<&str>,
             Ok(Match{ handler: tup, params }) => {
                 let &(ref method, ref handler): &(Method, Box<Handler>) = tup;
                 let authenticated = check_authentication(&req, &password);
-                set_auth_cookie(&mut res, &password);
+                if authenticated {
+                    set_auth_cookie(&mut res, &password);
+                }
                 if *method == req.method {
                     let pr = ParsedRequest {
                         req: req,
