@@ -9,8 +9,9 @@ extern crate route_recognizer;
 extern crate rumqtt;
 extern crate rustc_serialize;
 extern crate rusqlite;
-extern crate urlparse;
+extern crate sodiumoxide;
 extern crate time;
+extern crate urlparse;
 
 mod model;
 mod db;
@@ -23,6 +24,8 @@ use config::types::{Config, SettingsList};
 use std::path::Path;
 use std::io::{stderr, Write};
 use std::sync::{Arc, Mutex};
+use sodiumoxide::crypto::pwhash;
+use sodiumoxide::crypto::pwhash::Salt;
 
 fn main() {
     let arg_matches = App::new("clubstatusd")
@@ -54,11 +57,19 @@ fn main() {
     match db::connect(db_path_str) {
         Ok(con) => {
             let password = match conf.lookup_str("password") {
-                Some(s) => Some(s),
+                Some(s) => Some(String::from(s)),
                 None => {
                     writeln!(&mut stderr(),
                              "No password set, the whole API will be available unauthenticated.").unwrap();
                     None
+                }
+            };
+            let cookie_salt: Salt = match conf.lookup_str("cookie_salt") {
+                Some(s) => {
+                    hex_str_to_salt(s)
+                },
+                None => {
+                    pwhash::gen_salt()
                 }
             };
 
@@ -70,7 +81,7 @@ fn main() {
                                                        shared_con.clone());
 
             let listen_addr = conf.lookup_str_or("listen", "localhost:8000");
-            api::run(shared_con, listen_addr, password, mqtt_handler);
+            api::run(shared_con, listen_addr, password, cookie_salt, mqtt_handler);
         },
         Err(err) => {
             writeln!(&mut stderr(),
@@ -78,4 +89,14 @@ fn main() {
             std::process::exit(1);
         }
     }
+}
+
+fn hex_str_to_salt(s: &str) -> Salt {
+    let mut bytes = Vec::new();
+    for i in 0..32 {
+        let nibbles = &s[2*i..2*i+2];
+        let byte = u8::from_str_radix(nibbles, 16).unwrap();
+        bytes.push(byte);
+    }
+    Salt::from_slice(bytes.as_slice()).unwrap()
 }

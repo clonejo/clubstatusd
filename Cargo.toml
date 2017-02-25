@@ -16,6 +16,7 @@ route-recognizer = "0.1"
 urlparse = "^0.7"
 rumqtt = {git = "https://github.com/Ather-Energy/RuMqtt.git"}
 time = "^0.1"
+sodiumoxide = "0.0.14"
 
 [profile.release]
 opt-level = 3

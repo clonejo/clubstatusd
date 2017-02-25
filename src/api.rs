@@ -7,6 +7,7 @@ use std::collections::HashMap;
 use std::num::ParseIntError;
 use db::DbCon;
 use db;
+use rustc_serialize::hex::ToHex;
 use rustc_serialize::json::{Json, Object, ToJson};
 use std::sync::{Arc, Mutex};
 use std::io::Read;
@@ -20,6 +21,8 @@ use hyper::status::StatusCode;
 use route_recognizer::{Router, Match, Params};
 use urlparse;
 use chrono::{UTC, Datelike, TimeZone};
+use sodiumoxide::crypto::pwhash;
+use sodiumoxide::crypto::pwhash::Salt;
 
 trait Handler: Sync + Send + Any {
     fn handle(&self, pr: ParsedRequest, res: Response, con: Arc<Mutex<DbCon>>,
@@ -46,12 +49,15 @@ struct ParsedRequest<'a, 'b: 'a> {
     authenticated: bool
 }
 
-pub fn run(shared_con: Arc<Mutex<DbCon>>, listen: &str, password: Option<&str>,
-           mqtt: Option<Sender<TypedAction>>) {
-    let password = password.map(|s| String::from(s));
-
+pub fn run(shared_con: Arc<Mutex<DbCon>>, listen: &str, password: Option<String>,
+           cookie_salt: Salt, mqtt: Option<Sender<TypedAction>>) {
     let mqtt_arc = Arc::new(Mutex::new(mqtt.clone()));
     let presence_tracker = Arc::new(Mutex::new(db::presence::start_tracker(shared_con.clone(), mqtt.clone())));
+
+    let cookie = match password {
+        Some(ref pw) => Some(generate_cookie(&cookie_salt, pw)),
+        None => None
+    };
 
     let mut router: Router<(Method, Box<Handler>)> = Router::new();
     router.add("/api/versions", (Method::Get, Box::new(api_versions)));
@@ -74,7 +80,7 @@ pub fn run(shared_con: Arc<Mutex<DbCon>>, listen: &str, password: Option<&str>,
                 let &(ref method, ref handler): &(Method, Box<Handler>) = tup;
                 let authenticated = check_authentication(&req, &password);
                 if authenticated {
-                    set_auth_cookie(&mut res, &password);
+                    set_auth_cookie(&mut res, &cookie);
                 }
                 if *method == req.method {
                     let pr = ParsedRequest {
@@ -114,6 +120,16 @@ fn public_api_strip(json: &mut Json) {
     }
 }
 
+fn generate_cookie(cookie_salt: &Salt, password: &str) -> String {
+    let mut key = vec!(0; 32);
+    pwhash::derive_key(key.as_mut_slice(),
+                       password.as_bytes(),
+                       cookie_salt,
+                       pwhash::OPSLIMIT_INTERACTIVE,
+                       pwhash::MEMLIMIT_INTERACTIVE).unwrap();
+    (&key[..]).to_hex()
+}
+
 fn check_authentication(req: &Request, password: &Option<String>) -> bool {
     match *password {
         None => true,
@@ -137,15 +153,15 @@ fn check_authentication(req: &Request, password: &Option<String>) -> bool {
     }
 }
 
-fn set_auth_cookie(res: &mut Response, password: &Option<String>) {
-    match *password {
+fn set_auth_cookie(res: &mut Response, cookie: &Option<String>) {
+    match *cookie {
         None => {},
-        Some(ref pass_str) => {
+        Some(ref cookie_str) => {
             // cookie expires in 1 to 2 years
             let expiration_year = UTC::today().year() + 2;
             let expire_time = UTC.ymd(expiration_year, 1, 1).and_hms(0, 0, 0).format("%a, %m %b %Y %H:%M:%S GMT");
             res.headers_mut().set(header::SetCookie(vec![
-                                            format!("clubstatusd-password={}; Path=/; Expires={}", pass_str, expire_time)
+                                            format!("clubstatusd-password={}; Path=/; Expires={}", cookie_str, expire_time)
             ]));
         }
     }
