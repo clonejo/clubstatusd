@@ -1,6 +1,6 @@
 [package]
 name = "clubstatusd"
-version = "0.2.2"
+version = "0.2.3"
 authors = ["clonejo <clonejo@shakik.de>"]
 
 [dependencies]
