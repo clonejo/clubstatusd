@@ -54,8 +54,11 @@ pub fn run(shared_con: Arc<Mutex<DbCon>>, listen: &str, password: Option<String>
     let mqtt_arc = Arc::new(Mutex::new(mqtt.clone()));
     let presence_tracker = Arc::new(Mutex::new(db::presence::start_tracker(shared_con.clone(), mqtt.clone())));
 
-    let cookie = match password {
-        Some(ref pw) => Some(generate_cookie(&cookie_salt, pw)),
+    let pass_cookie = match password {
+        Some(pw) => {
+            let cookie = generate_cookie(&cookie_salt, pw.as_str());
+            Some((pw, cookie))
+        },
         None => None
     };
 
@@ -78,9 +81,18 @@ pub fn run(shared_con: Arc<Mutex<DbCon>>, listen: &str, password: Option<String>
         match match_result {
             Ok(Match{ handler: tup, params }) => {
                 let &(ref method, ref handler): &(Method, Box<Handler>) = tup;
-                let authenticated = check_authentication(&req, &password);
-                if authenticated {
-                    set_auth_cookie(&mut res, &cookie);
+                let authenticated = match pass_cookie {
+                    None =>
+                        true,
+                    Some((ref pass_str, ref cookie)) =>
+                         check_authentication(&req, pass_str, cookie)
+                };
+                if let Some((_, ref cookie)) = pass_cookie {
+                    if authenticated {
+                        set_auth_cookie(&mut res, cookie.as_str());
+                    } else {
+                        clear_auth_cookie(&mut res);
+                    }
                 }
                 if *method == req.method {
                     let pr = ParsedRequest {
@@ -130,41 +142,35 @@ fn generate_cookie(cookie_salt: &Salt, password: &str) -> String {
     (&key[..]).to_hex()
 }
 
-fn check_authentication(req: &Request, password: &Option<String>) -> bool {
-    match *password {
-        None => true,
-        Some(ref pass_str) => {
-            if let Some(cookies) = req.headers.get::<header::Cookie>() {
-                let correct_cookie = format!("clubstatusd-password={}", pass_str);
-                if cookies.iter().any(|&ref c| c == correct_cookie.as_str()) {
-                    return true;
-                }
-            }
-            match req.headers.get::<header::Authorization<header::Basic>>() {
-                Some(&header::Authorization(header::Basic {
-                    username: _,
-                    password: Some(ref tried_password)
-                })) => {
-                    tried_password == pass_str
-                },
-                _ => false
-            }
+fn check_authentication(req: &Request, password: &str, cookie_value: &str) -> bool {
+    if let Some(cookies) = req.headers.get::<header::Cookie>() {
+        let correct_cookie = format!("clubstatusd-password={}", cookie_value);
+        if cookies.iter().any(|&ref c| c == correct_cookie.as_str()) {
+            return true;
         }
+    }
+    match req.headers.get::<header::Authorization<header::Basic>>() {
+        Some(&header::Authorization(header::Basic {
+            username: _,
+            password: Some(ref tried_password)
+        })) => {
+            tried_password == password
+        },
+        _ => false
     }
 }
 
-fn set_auth_cookie(res: &mut Response, cookie: &Option<String>) {
-    match *cookie {
-        None => {},
-        Some(ref cookie_str) => {
-            // cookie expires in 1 to 2 years
-            let expiration_year = UTC::today().year() + 2;
-            let expire_time = UTC.ymd(expiration_year, 1, 1).and_hms(0, 0, 0).format("%a, %m %b %Y %H:%M:%S GMT");
-            res.headers_mut().set(header::SetCookie(vec![
-                                            format!("clubstatusd-password={}; Path=/; Expires={}", cookie_str, expire_time)
-            ]));
-        }
-    }
+fn set_auth_cookie(res: &mut Response, cookie: &str) {
+    // cookie expires in 1 to 2 years
+    let expiration_year = UTC::today().year() + 2;
+    let expire_time = UTC.ymd(expiration_year, 1, 1).and_hms(0, 0, 0).format("%a, %m %b %Y %H:%M:%S GMT");
+    res.headers_mut().set(header::SetCookie(vec![
+        format!("clubstatusd-password={}; Path=/; Expires={}", cookie, expire_time)
+    ]));
+}
+
+fn clear_auth_cookie(res: &mut Response) {
+    set_auth_cookie(res, "");
 }
 
 fn parse_get_params<'a>(get_params_str: Option<String>) -> GetParams<'a> {
