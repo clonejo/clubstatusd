@@ -1,31 +1,33 @@
 use std::path::Path;
-use rusqlite::{SqliteConnection, SqliteError};
+use rusqlite::{Connection, Transaction, Error};
 use std::fs;
 use model::*;
 use db::DbStored;
 
-pub fn ensure_initialized(path: &Path) -> Result<(), SqliteError> {
+pub fn ensure_initialized(path: &Path) -> Result<(), Error> {
     match fs::metadata(path) {
         Err(_) => {
             println!("creating db at {:?}", path);
-            let con = try!(SqliteConnection::open(path));
-            create_tables(&con);
-            insert_initial_status(&con);
-            insert_initial_presence(&con);
+            let mut con = try!(Connection::open(path));
+            let transaction = con.transaction().unwrap();
+            create_tables(&transaction);
+            insert_initial_status(&transaction);
+            insert_initial_presence(&transaction);
+            transaction.commit().unwrap();
         }
         Ok(_) => {}
     }
     Ok(())
 }
 
-fn create_tables(con: &SqliteConnection) {
+fn create_tables(tx: &Transaction) {
     /*
      * types:
      *   0: status
      *   1: announcement
      *   2: presence
      */
-    con.execute("CREATE TABLE action (
+    tx.execute("CREATE TABLE action (
                      id INTEGER PRIMARY KEY AUTOINCREMENT,
                      time INTEGER NOT NULL,
                      type INTEGER NOT NULL,
@@ -33,13 +35,13 @@ fn create_tables(con: &SqliteConnection) {
                  )", &[]).unwrap();
 
     /*
- * status:
- *   0: closed
- *   1: private
- *   2: public
- * changed: boolean
- */
-con.execute("CREATE TABLE status_action (
+     * status:
+     *   0: closed
+     *   1: private
+     *   2: public
+     * changed: boolean
+     */
+    tx.execute("CREATE TABLE status_action (
                  id INTEGER PRIMARY KEY,
                  user TEXT NOT NULL,
                  status INTEGER NOT NULL,
@@ -47,14 +49,14 @@ con.execute("CREATE TABLE status_action (
                  public_changed INTEGER NOT NULL
              )", &[]).unwrap();
 
-/*
- * method:
- *   0: new
- *   1: mod
- *   2: del
- * public: boolean
- */
-con.execute("CREATE TABLE announcement_action (
+    /*
+     * method:
+     *   0: new
+     *   1: mod
+     *   2: del
+     * public: boolean
+     */
+    tx.execute("CREATE TABLE announcement_action (
                  id INTEGER PRIMARY KEY,
                  method INTEGER,
                  aid INTEGER,
@@ -64,21 +66,21 @@ con.execute("CREATE TABLE announcement_action (
                  public INTEGER
              )", &[]).unwrap();
 
-con.execute("CREATE TABLE presence_action (
+    tx.execute("CREATE TABLE presence_action (
                  id INTEGER,
                  user TEXT NOT NULL,
                  since INTEGER
              )", &[]).unwrap();
 }
 
-fn insert_initial_status(con: &SqliteConnection) {
+fn insert_initial_status(tx: &Transaction) {
     let mut status_action = StatusAction::new(
         "initial state".into(), 0, "Hans Acker".into(), Status::Closed);
-    status_action.store(con, &None).unwrap();
+    status_action.store(tx, &None).unwrap();
 }
 
-fn insert_initial_presence(con: &SqliteConnection) {
+fn insert_initial_presence(tx: &Transaction) {
     let mut presence_action = PresenceAction::new_with_time(
         "initial state".into(), 0, vec![]);
-    presence_action.store(con, &None).unwrap();
+    presence_action.store(tx, &None).unwrap();
 }

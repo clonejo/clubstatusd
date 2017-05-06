@@ -1,4 +1,5 @@
 
+#[allow(unused_imports)]
 use model::*;
 
 #[test]

@@ -296,7 +296,6 @@ pub fn parse_time_string(s: &str, now: i64) -> Result<i64, String> {
             }
         }
     }
-    Err("bad time specification".into())
 }
 
 fn get_public(obj: &Object) -> Result<bool, String> {

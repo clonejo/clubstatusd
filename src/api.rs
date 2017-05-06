@@ -246,8 +246,9 @@ fn create_action(mut pr: ParsedRequest, mut res: Response, shared_con: Arc<Mutex
             let now = UTC::now().timestamp();
             match json_to_object(action_json, now) {
                 Ok(RequestObject::Action(mut action)) => {
-                    let con = shared_con.lock().unwrap();
-                    match action.store(&*con, &*mqtt.lock().unwrap()) {
+                    let mut con = shared_con.lock().unwrap();
+                    let transaction = con.transaction().unwrap();
+                    match action.store(&transaction, &*mqtt.lock().unwrap()) {
                         Some(action_id) => {
                             {
                                 let headers = res.headers_mut();
@@ -261,6 +262,7 @@ fn create_action(mut pr: ParsedRequest, mut res: Response, shared_con: Arc<Mutex
                             send(res, StatusCode::BadRequest, "bad request".as_bytes())
                         }
                     }
+                    transaction.commit().unwrap();
                 },
                 Ok(RequestObject::PresenceRequest(username)) => {
                     presence_tracker.lock().unwrap().send(username).unwrap();
@@ -519,8 +521,8 @@ fn query(pr: ParsedRequest, mut res: Response, shared_con: Arc<Mutex<DbCon>>,
     //println!("type: {:?} id: {:?} time: {:?} count: {:?} take: {:?}", type_, id, time, count, take);
 
     let mut obj = Object::new();
-    let con = shared_con.lock().unwrap();
-    let actions = db::query(type_, id, time, count, take, &*con);
+    let mut con = shared_con.lock().unwrap();
+    let actions = db::query(type_, id, time, count, take, &mut *con);
     obj.insert("actions".into(), actions.unwrap().to_json());
 
     {
