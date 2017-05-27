@@ -7,7 +7,6 @@ use api::{IdExpr, RangeExpr, Take};
 use std::sync::mpsc::Sender;
 
 mod init;
-pub mod mqtt;
 
 pub use db::init::ensure_initialized;
 

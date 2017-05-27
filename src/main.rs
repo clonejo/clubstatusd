@@ -77,8 +77,8 @@ fn main() {
 
             let mqtt_server = conf.lookup_str("mqtt.server").map(|s| String::from(s));
             let mqtt_topic_prefix = String::from(conf.lookup_str_or("mqtt.topic_prefix", ""));
-            let mqtt_handler = db::mqtt::start_handler(mqtt_server, mqtt_topic_prefix,
-                                                       shared_con.clone());
+            let mqtt_handler = api::mqtt::start_handler(mqtt_server, mqtt_topic_prefix,
+                                                        shared_con.clone());
 
             let listen_addr = conf.lookup_str_or("listen", "localhost:8000");
             api::run(shared_con, listen_addr, password, cookie_salt, mqtt_handler);

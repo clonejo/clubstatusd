@@ -24,6 +24,8 @@ use chrono::{UTC, Datelike, TimeZone};
 use sodiumoxide::crypto::pwhash;
 use sodiumoxide::crypto::pwhash::Salt;
 
+pub mod mqtt;
+
 trait Handler: Sync + Send + Any {
     fn handle(&self, pr: ParsedRequest, res: Response, con: Arc<Mutex<DbCon>>,
               presence_tracker: Arc<Mutex<Sender<String>>>,
