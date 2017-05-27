@@ -10,12 +10,21 @@ use model::*;
 use db::{DbCon, status};
 
 fn publish_status(action: &StatusAction, mqtt_request: &mut MqRequest, topic_prefix: &str) {
-    let payload = match action.status {
-        Status::Public => "public",
-        Status::Private => "private",
-        Status::Closed => "closed"
-    };
-    mqtt_request.retained_publish(format!("{}status", topic_prefix).as_str(), QoS::Level1, payload.into()).unwrap();
+    use rustc_serialize::json::ToJson;
+
+    {
+        let payload = match action.status {
+            Status::Public => "public",
+            Status::Private => "private",
+            Status::Closed => "closed"
+        };
+        mqtt_request.retained_publish(format!("{}status", topic_prefix).as_str(), QoS::Level1,
+            payload.into()).unwrap();
+    }
+    {
+        mqtt_request.retained_publish(format!("{}status/last", topic_prefix).as_str(), QoS::Level1,
+            action.to_json().to_string().into()).unwrap();
+    }
 
 }
 
