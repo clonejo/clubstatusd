@@ -280,14 +280,14 @@ pub fn parse_time_string(s: &str, now: i64) -> Result<i64, String> {
                     return Err("bad time specification".into());
                 },
                 Some(captures) => {
-                    let mut i: i64 = try!(parse_u64_string(captures.at(2).unwrap())) as i64;
-                    match captures.at(1) {
-                        Some("+") => {
+                    let mut i: i64 = try!(parse_u64_string(captures.get(2).unwrap().as_str())) as i64;
+                    match captures.get(1).unwrap().as_str() {
+                        "+" => {
                         },
-                        Some("-") => {
+                        "-" => {
                             i = -i;
                         },
-                        Some(_) | None => {
+                        _ => {
                             panic!("should be impossible");
                         }
                     }
