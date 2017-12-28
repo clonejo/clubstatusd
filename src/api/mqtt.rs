@@ -4,12 +4,12 @@ use std::sync::mpsc::{channel, Sender, TryRecvError};
 use std::thread;
 use std::time::Duration;
 
-use rumqtt::{MqttOptions, MqttClient, MqRequest, QoS};
+use rumqtt::{MqttOptions, MqttClient, QoS};
 
 use model::*;
 use db::{DbCon, status};
 
-fn publish_status(action: &StatusAction, mqtt_request: &mut MqRequest, topic_prefix: &str) {
+fn publish_status(action: &StatusAction, mqtt_request: &mut MqttClient, topic_prefix: &str) {
     use rustc_serialize::json::ToJson;
 
     {
@@ -28,12 +28,12 @@ fn publish_status(action: &StatusAction, mqtt_request: &mut MqRequest, topic_pre
 
 }
 
-fn publish_announcement(_action: &AnnouncementAction, mqtt_request: &mut MqRequest, topic_prefix: &str) {
+fn publish_announcement(_action: &AnnouncementAction, mqtt_request: &mut MqttClient, topic_prefix: &str) {
         mqtt_request.publish(
             format!("{}announcement", topic_prefix).as_str(), QoS::Level1, "not_implemented".into()).unwrap();
 }
 
-fn publish_presence<'a>(action: &'a PresenceAction, client: &mut MqRequest, topic_prefix: &str) {
+fn publish_presence<'a>(action: &'a PresenceAction, client: &mut MqttClient, topic_prefix: &str) {
     let mut users: Vec<&'a str> = action.users.iter()
         .filter(|u: &&PresentUser| -> bool {
             u.status != PresentUserStatus::Left
@@ -65,8 +65,9 @@ pub fn start_handler(server: Option<String>, topic_prefix: String, shared_con: A
                 let opts = MqttOptions::new()
                     .set_keep_alive(30)
                     .set_reconnect(30)
-                    .broker(server_str.as_str());
-                let mut mqtt_request = MqttClient::new(opts).start().expect("could not connect to mqtt server");
+                    .set_broker(server_str.as_str());
+                let mut mqtt_request = MqttClient::start(opts, None)
+                    .expect("could not connect to mqtt server");
                 println!("connected to mqtt server");
 
                 let last_status = {

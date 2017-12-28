@@ -108,7 +108,7 @@ pub struct AnnouncementAction {
     pub public: bool
 }
 
-#[derive(Clone, Debug,PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum AnnouncementMethod {
     New,
     Mod,

@@ -236,8 +236,8 @@ fn create_action(mut pr: ParsedRequest, mut res: Response, shared_con: Arc<Mutex
         send_unauthorized(res);
         return;
     }
-    let mut action_buf = &mut [0; 1024];
     // parse at maximum 1k bytes
+    let action_buf = &mut [0; 1024];
     let bytes_read = pr.req.read(action_buf).unwrap();
     let (action_buf, _) = action_buf.split_at(bytes_read);
     let action_str = str::from_utf8(action_buf).unwrap();

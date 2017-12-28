@@ -10,11 +10,11 @@ libc = "0.2"
 rustc-serialize = "0.3"
 clap = "1.*"
 config = "~0.1.0"
-hyper = "*"
+hyper = "0.10.9"
 regex = "0.1"
 route-recognizer = "0.1"
 urlparse = "^0.7"
-rumqtt = {git = "https://github.com/Ather-Energy/RuMqtt.git"}
+rumqtt = "0.10.1"
 time = "^0.1"
 sodiumoxide = "0.0.14"
 

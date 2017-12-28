@@ -503,7 +503,7 @@ pub mod presence {
                 loop {
                     match rx.try_recv() {
                         Ok(username) => {
-                            let mut presence = users.entry(username).or_insert_with(
+                            let presence = users.entry(username).or_insert_with(
                                 || {
                                     changed = true;
                                     UserPresence{
