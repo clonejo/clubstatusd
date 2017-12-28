@@ -308,7 +308,7 @@ pub mod announcements {
                                     ? <= \"to\" AND \
                                     announcement_action.method != 2 \
                                     ORDER BY \"from\" LIMIT 30").unwrap();
-        let now = UTC::now().timestamp();
+        let now = Utc::now().timestamp();
         let actions_iter = stmt.query_map(&[&now], row_to_announcement_action).unwrap();
         let actions: Vec<AnnouncementAction> = actions_iter.map(|action| { action.unwrap() }).collect();
         Ok(actions)
@@ -324,7 +324,7 @@ pub mod announcements {
                                     announcement_action.method != 2 AND \
                                     announcement_action.public = 1 \
                                     ORDER BY \"from\" LIMIT 30").unwrap();
-        let now = UTC::now().timestamp();
+        let now = Utc::now().timestamp();
         let actions_iter = stmt.query_map(&[&now], row_to_announcement_action).unwrap();
         let actions: Vec<AnnouncementAction> = actions_iter.map(|action| { action.unwrap() }).collect();
         Ok(actions)
@@ -374,7 +374,7 @@ pub mod presence {
     use std::collections::HashMap;
     use std::iter::FromIterator;
     use std::sync::{Arc, Mutex};
-    use chrono::UTC;
+    use chrono::Utc;
 
     fn row_to_base_action(row: &Row) -> BaseAction {
         BaseAction {
@@ -440,7 +440,7 @@ pub mod presence {
                 let con = shared_con.lock().unwrap();
                 get_last(&*con).unwrap()
             };
-            let mut now = UTC::now().timestamp();
+            let mut now = Utc::now().timestamp();
             let mut users: HashMap<String, UserPresence> = HashMap::new();
             for user in last_action.users {
                 users.insert(user.name, UserPresence{
@@ -499,7 +499,7 @@ pub mod presence {
                 thread::sleep(Duration::new(20, 0)); // create one presence action every 20s
 
                 // add requests to user list
-                now = UTC::now().timestamp();
+                now = Utc::now().timestamp();
                 loop {
                     match rx.try_recv() {
                         Ok(username) => {

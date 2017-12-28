@@ -20,7 +20,7 @@ use hyper::method::Method;
 use hyper::status::StatusCode;
 use route_recognizer::{Router, Match, Params};
 use urlparse;
-use chrono::{UTC, Datelike, TimeZone};
+use chrono::{Utc, Datelike, TimeZone};
 use sodiumoxide::crypto::pwhash;
 use sodiumoxide::crypto::pwhash::Salt;
 
@@ -164,8 +164,8 @@ fn check_authentication(req: &Request, password: &str, cookie_value: &str) -> bo
 
 fn set_auth_cookie(res: &mut Response, cookie: &str) {
     // cookie expires in 1 to 2 years
-    let expiration_year = UTC::today().year() + 2;
-    let expire_time = UTC.ymd(expiration_year, 1, 1).and_hms(0, 0, 0).format("%a, %m %b %Y %H:%M:%S GMT");
+    let expiration_year = Utc::today().year() + 2;
+    let expire_time = Utc.ymd(expiration_year, 1, 1).and_hms(0, 0, 0).format("%a, %m %b %Y %H:%M:%S GMT");
     res.headers_mut().set(header::SetCookie(vec![
         format!("clubstatusd-password={}; Path=/; Expires={}", cookie, expire_time)
     ]));
@@ -245,7 +245,7 @@ fn create_action(mut pr: ParsedRequest, mut res: Response, shared_con: Arc<Mutex
         Err(_) =>
             send_status(res, StatusCode::BadRequest),
         Ok(action_json) => {
-            let now = UTC::now().timestamp();
+            let now = Utc::now().timestamp();
             match json_to_object(action_json, now) {
                 Ok(RequestObject::Action(mut action)) => {
                     let mut con = shared_con.lock().unwrap();
@@ -474,7 +474,7 @@ fn query(pr: ParsedRequest, mut res: Response, shared_con: Arc<Mutex<DbCon>>,
         Some(&Some(ref s)) => {
             match s.parse::<RangeExpr<String>>() {
                 Ok(t) => {
-                    let now = UTC::now().timestamp();
+                    let now = Utc::now().timestamp();
                     match t.map(|s| parse_time_string(&*s, now)) {
                         Ok(m) => m,
                         Err(_) => {

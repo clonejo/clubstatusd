@@ -1,5 +1,5 @@
 
-use chrono::*;
+use chrono::Utc;
 use rustc_serialize::json::{Json, Object, ToJson};
 use db::DbStored;
 use regex::Regex;
@@ -13,7 +13,7 @@ pub struct BaseAction {
 
 impl BaseAction {
     fn new(note: String) -> BaseAction {
-        Self::new_with_time(note, UTC::now().timestamp())
+        Self::new_with_time(note, Utc::now().timestamp())
     }
 
     fn new_with_time(note: String, time: i64) -> BaseAction {
@@ -147,7 +147,7 @@ pub struct PresenceAction {
 
 impl PresenceAction {
     pub fn new(note: String, users: Vec<PresentUser>) -> Self {
-        Self::new_with_time(note, UTC::now().timestamp(), users)
+        Self::new_with_time(note, Utc::now().timestamp(), users)
     }
 
     pub fn new_with_time(note: String, time: i64, users: Vec<PresentUser>) -> Self {

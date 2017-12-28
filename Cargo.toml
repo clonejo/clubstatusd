@@ -4,19 +4,19 @@ version = "0.2.5"
 authors = ["clonejo <clonejo@shakik.de>"]
 
 [dependencies]
-rusqlite = "0.11.0"
-chrono = "0.2"
+rusqlite = "0.13.0"
+chrono = "0.4.0"
 libc = "0.2"
 rustc-serialize = "0.3"
-clap = "1.*"
-config = "~0.1.0"
+clap = "2.29.0"
+config = "0.7.0"
 hyper = "0.10.9"
 regex = "0.1"
 route-recognizer = "0.1"
 urlparse = "^0.7"
 rumqtt = "0.10.1"
 time = "^0.1"
-sodiumoxide = "0.0.14"
+sodiumoxide = "0.0.16"
 
 [profile.release]
 opt-level = 3
