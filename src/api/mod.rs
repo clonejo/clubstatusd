@@ -24,6 +24,7 @@ use urlparse;
 
 use db;
 use db::DbCon;
+use model::Status;
 
 pub mod mqtt;
 
@@ -78,6 +79,7 @@ pub fn run(
     password: Option<String>,
     cookie_salt: Salt,
     mqtt: Option<Sender<TypedAction>>,
+    spaceapi_static: Option<Object>,
 ) {
     let mqtt_arc = Arc::new(Mutex::new(mqtt.clone()));
     let presence_tracker = Arc::new(Mutex::new(db::presence::start_tracker(
@@ -105,6 +107,23 @@ pub fn run(
         "/api/v0/announcement/current",
         (Method::Get, Box::new(announcement_current)),
     );
+    if let Some(s) = spaceapi_static {
+        router.add(
+            "/spaceapi",
+            (
+                Method::Get,
+                Box::new(
+                    move |_pr: ParsedRequest,
+                          res: Response,
+                          shared_con: Arc<Mutex<DbCon>>,
+                          _: Arc<Mutex<Sender<String>>>,
+                          _: Arc<Mutex<Option<Sender<TypedAction>>>>| {
+                        spaceapi(res, shared_con, s.clone())
+                    },
+                ),
+            ),
+        );
+    }
 
     Server::http(listen)
         .unwrap()
@@ -616,6 +635,31 @@ fn query(
         headers.set(header::ContentType::json());
     }
     let mut resp_str = obj.to_json().to_string();
+    resp_str.push('\n');
+    res.send(resp_str.as_bytes()).unwrap();
+}
+
+fn spaceapi(mut res: Response, shared_con: Arc<Mutex<DbCon>>, spaceapi_static: Object) {
+    let changed_action = {
+        let con = shared_con.lock().unwrap();
+        db::status::get_last_changed_public(&*con).unwrap()
+    };
+
+    let mut root = spaceapi_static;
+    let mut state = Object::new();
+    state.insert(
+        "open".into(),
+        Json::Boolean(changed_action.status == Status::Public),
+    );
+    state.insert("lastchange".into(), Json::I64(changed_action.action.time));
+    root.insert("state".into(), state.to_json());
+
+    {
+        let headers = res.headers_mut();
+        headers.set(header::ContentType::json());
+        headers.set(header::AccessControlAllowOrigin::Any);
+    }
+    let mut resp_str = root.to_json().to_string();
     resp_str.push('\n');
     res.send(resp_str.as_bytes()).unwrap();
 }

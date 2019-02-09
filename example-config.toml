@@ -19,6 +19,29 @@ database_path = "./db.sqlite"
 # generate with python: secrets.token_hex(32)
 #cookie_salt = "00112233445566778899aabbccddeeff00112233445566778899aabbccddeeff"
 
+# If given, provide a spaceapi compatible output at /spaceapi
+# You can set any constant parts within the string.
+# Do not add the 'state' element to the root, clubstatusd does this for you.
+spaceapi = """
+{
+    "api": "0.13",
+    "space": "Slopspace",
+    "logo": "http://your-space.org/img/logo.png",
+    "url": "http://your-space.org",
+    "location": {
+        "address": "Ulmer Strasse 255, 70327 Stuttgart, Germany",
+        "lon": 9.236,
+        "lat": 48.777
+    },
+    "contact": {
+        "twitter": "@spaceapi"
+    },
+    "issue_report_channels": [
+        "twitter"
+    ]
+}
+"""
+
 [mqtt]
 # MQTT Server to send changes to
 # MQTT is enabled when uncommented
