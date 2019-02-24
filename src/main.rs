@@ -40,7 +40,7 @@ fn main() {
                 .help("set config file to use"))
         .get_matches();
 
-    let config_path = Path::new(arg_matches.value_of("CONFIG").unwrap_or("/etc/clubstatusd.conf"));
+    let config_path = Path::new(arg_matches.value_of("CONFIG").unwrap_or("/etc/clubstatusd"));
     let mut conf = Config::default();
     if let Err(err) =  conf.merge(config::File::with_name(config_path.to_str().unwrap())) {
         if arg_matches.is_present("CONFIG") || config_path.is_file() {
@@ -64,14 +64,15 @@ fn main() {
                     panic!();
                 }
             };
-            let cookie_salt: Salt = match conf.get("cookie_salt") {
+            let cookie_salt: Salt = match conf.get_str("cookie_salt") {
                 Ok(s) => {
-                    hex_str_to_salt(s)
+                    hex_str_to_salt(s.as_str())
                 },
                 Err(ConfigError::NotFound(_)) => {
                     pwhash::gen_salt()
                 },
-                Err(_) => {
+                Err(e) => {
+                    dbg!(e);
                     panic!();
                 }
             };
