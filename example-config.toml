@@ -1,15 +1,15 @@
 
 # What address to listen on, default:
-#listen = "localhost:8000";
+#listen = "localhost:8000"
 
 # Path to sqlite database, default:
-#database_path = "/var/local/clubstatusd/db.sqlite";
-database_path = "./db.sqlite";
+#database_path = "/var/local/clubstatusd/db.sqlite"
+database_path = "./db.sqlite"
 
 # Restrict the API to clients with the correct password (HTTP Basic Auth):
 # If no password is set (!= an empty password), the whole API will be available
 # without authentication.
-#password = "some password";
+#password = "some password"
 
 # A salt used to derive a cookie value from the password.
 # If no password is set (default), a random value will be generated at each
@@ -17,16 +17,15 @@ database_path = "./db.sqlite";
 # If you enable this, you want to generate your own salt.
 # Has to be 32 bytes in hex format.
 # generate with python: secrets.token_hex(32)
-#cookie_salt = "00112233445566778899aabbccddeeff00112233445566778899aabbccddeeff";
+#cookie_salt = "00112233445566778899aabbccddeeff00112233445566778899aabbccddeeff"
 
-mqtt = {
-    # MQTT Server to send changes to
-    # MQTT is enabled when uncommented
-    #server = "mqtt.example.org:1883";
-    server = "mqtt.space.aachen.ccc.de:1883";
+[mqtt]
+# MQTT Server to send changes to
+# MQTT is enabled when uncommented
+#server = "mqtt.example.org:1883";
+server = "mqtt.space.aachen.ccc.de:1883"
 
-    # don't forget trailing slash
-    # default: no prefix
-    #topic_prefix = "status/";
-    topic_prefix = "test-status/";
-};
+# don't forget trailing slash
+# default: no prefix
+#topic_prefix = "status/"
+topic_prefix = "test-status/"
