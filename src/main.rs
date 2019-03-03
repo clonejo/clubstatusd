@@ -50,8 +50,9 @@ fn main() {
         writeln!(&mut stderr(), "No config file, assuming default values.").unwrap();
     }
 
-    let db_path_str = conf.get("database_path").unwrap_or("/var/local/clubstatusd/db.sqlite");
-    match db::connect(db_path_str) {
+    let db_path_str = conf.get_str("database_path")
+        .unwrap_or(String::from("/var/local/clubstatusd/db.sqlite"));
+    match db::connect(db_path_str.as_str()) {
         Ok(con) => {
             let password = match conf.get_str("password") {
                 Ok(s) => Some(String::from(s)),
@@ -80,12 +81,13 @@ fn main() {
             let shared_con = Arc::new(Mutex::new(con));
 
             let mqtt_server = conf.get_str("mqtt.server").ok().map(|s| String::from(s));
-            let mqtt_topic_prefix = conf.get("mqtt.topic_prefix").unwrap_or_else(|_| String::from(""));
-            let mqtt_handler = api::mqtt::start_handler(mqtt_server, mqtt_topic_prefix,
+            let port = conf.get_int("mqtt.port").unwrap_or(1883) as u16;
+            let mqtt_topic_prefix = conf.get_str("mqtt.topic_prefix").unwrap_or_else(|_| String::from(""));
+            let mqtt_handler = api::mqtt::start_handler(mqtt_server, port, mqtt_topic_prefix,
                                                         shared_con.clone());
 
-            let listen_addr = conf.get("listen").unwrap_or("localhost:8000");
-            api::run(shared_con, listen_addr, password, cookie_salt, mqtt_handler);
+            let listen_addr = conf.get_str("listen").unwrap_or(String::from("localhost:8000"));
+            api::run(shared_con, listen_addr.as_str(), password, cookie_salt, mqtt_handler);
         },
         Err(err) => {
             writeln!(&mut stderr(),

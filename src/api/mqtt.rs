@@ -57,25 +57,32 @@ fn publish_presence<'a>(action: &'a PresenceAction, client: &mut MqttClient, top
     }
 }
 
-pub fn start_handler(server: Option<String>, topic_prefix: String, shared_con: Arc<Mutex<DbCon>>)
+pub fn start_handler(server: Option<String>, port: u16, topic_prefix: String, shared_con: Arc<Mutex<DbCon>>)
     -> Option<Sender<TypedAction>> {
 
     let (tx, rx) = channel::<TypedAction>();
     match server {
         Some(server_str) => {
             thread::Builder::new().name(String::from("mqtt_client")).spawn(move || {
-                let opts = MqttOptions::new("clubstatusd", server_str, 1883)
+                println!("will connect to mqtt server {}, port {}", server_str, port);
+                let opts = MqttOptions::new("clubstatusd", server_str, port)
                     .set_keep_alive(30)
-                    .set_reconnect_opts(ReconnectOptions::Always(30));
-                let (mut mqtt_client, _mqtt_receiver) = MqttClient::start(opts)
-                    .expect("could not connect to mqtt server");
-                println!("connected to mqtt server");
+                    .set_reconnect_opts(ReconnectOptions::AfterFirstSuccess(30));
+                let (mut mqtt_client, _mqtt_receiver) =
+                    match MqttClient::start(opts) {
+                        Ok(r) => r,
+                        Err(e) => {
+                            eprintln!("could not connect to mqtt server: {}", e);
+                            std::process::exit(1);
+                        }
+                    };
 
                 let last_status = {
                     let con = shared_con.lock().unwrap();
                     status::get_last(&*con).unwrap()
                 };
                 publish_status(&last_status, &mut mqtt_client, &*topic_prefix);
+                println!("published current status on mqtt");
 
                 loop {
                     loop {

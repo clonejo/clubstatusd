@@ -23,7 +23,8 @@ database_path = "./db.sqlite"
 # MQTT Server to send changes to
 # MQTT is enabled when uncommented
 #server = "mqtt.example.org:1883";
-server = "mqtt.space.aachen.ccc.de:1883"
+#port = 1883
+server = "mqtt.tihange.aachen.ccc.de"
 
 # don't forget trailing slash
 # default: no prefix
