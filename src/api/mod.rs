@@ -1,43 +1,64 @@
-
 use std::any::Any;
 use std::cmp::{min, Ordering};
+use std::collections::HashMap;
+use std::io::Read;
+use std::num::ParseIntError;
 use std::str;
 use std::str::FromStr;
-use std::collections::HashMap;
-use std::num::ParseIntError;
-use db::DbCon;
-use db;
+use std::sync::mpsc::Sender;
+use std::sync::{Arc, Mutex};
+
+use chrono::{Datelike, TimeZone, Utc};
+use hyper::header;
+use hyper::method::Method;
+use hyper::server::{Request, Response, Server};
+use hyper::status::StatusCode;
+use hyper::uri::RequestUri;
+use model::{json_to_object, parse_time_string, QueryActionType, RequestObject, TypedAction};
+use route_recognizer::{Match, Params, Router};
 use rustc_serialize::hex::ToHex;
 use rustc_serialize::json::{Json, Object, ToJson};
-use std::sync::{Arc, Mutex};
-use std::io::Read;
-use std::sync::mpsc::Sender;
-use model::{json_to_object, QueryActionType, RequestObject, parse_time_string, TypedAction};
-use hyper::server::{Server, Request, Response};
-use hyper::header;
-use hyper::uri::RequestUri;
-use hyper::method::Method;
-use hyper::status::StatusCode;
-use route_recognizer::{Router, Match, Params};
-use urlparse;
-use chrono::{Utc, Datelike, TimeZone};
 use sodiumoxide::crypto::pwhash;
 use sodiumoxide::crypto::pwhash::Salt;
+use urlparse;
+
+use db;
+use db::DbCon;
 
 pub mod mqtt;
 
 trait Handler: Sync + Send + Any {
-    fn handle(&self, pr: ParsedRequest, res: Response, con: Arc<Mutex<DbCon>>,
-              presence_tracker: Arc<Mutex<Sender<String>>>,
-              mqtt: Arc<Mutex<Option<Sender<TypedAction>>>>);
+    fn handle(
+        &self,
+        pr: ParsedRequest,
+        res: Response,
+        con: Arc<Mutex<DbCon>>,
+        presence_tracker: Arc<Mutex<Sender<String>>>,
+        mqtt: Arc<Mutex<Option<Sender<TypedAction>>>>,
+    );
 }
 
 impl<F> Handler for F
-where F: Send + Sync + Any + Fn(ParsedRequest, Response, Arc<Mutex<DbCon>>, Arc<Mutex<Sender<String>>>,
-                                Arc<Mutex<Option<Sender<TypedAction>>>>) {
-    fn handle(&self, pr: ParsedRequest, res: Response, con: Arc<Mutex<DbCon>>,
-              presence_tracker: Arc<Mutex<Sender<String>>>,
-              mqtt: Arc<Mutex<Option<Sender<TypedAction>>>>) {
+where
+    F: Send
+        + Sync
+        + Any
+        + Fn(
+            ParsedRequest,
+            Response,
+            Arc<Mutex<DbCon>>,
+            Arc<Mutex<Sender<String>>>,
+            Arc<Mutex<Option<Sender<TypedAction>>>>,
+        ),
+{
+    fn handle(
+        &self,
+        pr: ParsedRequest,
+        res: Response,
+        con: Arc<Mutex<DbCon>>,
+        presence_tracker: Arc<Mutex<Sender<String>>>,
+        mqtt: Arc<Mutex<Option<Sender<TypedAction>>>>,
+    ) {
         (*self)(pr, res, con, presence_tracker, mqtt);
     }
 }
@@ -48,71 +69,99 @@ struct ParsedRequest<'a, 'b: 'a> {
     req: Request<'a, 'b>,
     path_params: Params,
     get_params_str: Option<String>,
-    authenticated: bool
+    authenticated: bool,
 }
 
-pub fn run(shared_con: Arc<Mutex<DbCon>>, listen: &str, password: Option<String>,
-           cookie_salt: Salt, mqtt: Option<Sender<TypedAction>>) {
+pub fn run(
+    shared_con: Arc<Mutex<DbCon>>,
+    listen: &str,
+    password: Option<String>,
+    cookie_salt: Salt,
+    mqtt: Option<Sender<TypedAction>>,
+) {
     let mqtt_arc = Arc::new(Mutex::new(mqtt.clone()));
-    let presence_tracker = Arc::new(Mutex::new(db::presence::start_tracker(shared_con.clone(), mqtt.clone())));
+    let presence_tracker = Arc::new(Mutex::new(db::presence::start_tracker(
+        shared_con.clone(),
+        mqtt.clone(),
+    )));
 
     let pass_cookie = match password {
         Some(pw) => {
             let cookie = generate_cookie(&cookie_salt, pw.as_str());
             Some((pw, cookie))
-        },
-        None => None
+        }
+        None => None,
     };
 
     let mut router: Router<(Method, Box<Handler>)> = Router::new();
     router.add("/api/versions", (Method::Get, Box::new(api_versions)));
     router.add("/api/v0", (Method::Put, Box::new(create_action)));
     router.add("/api/v0/:type", (Method::Get, Box::new(query)));
-    router.add("/api/v0/status/current", (Method::Get, Box::new(status_current)));
-    router.add("/api/v0/announcement/current", (Method::Get, Box::new(announcement_current)));
+    router.add(
+        "/api/v0/status/current",
+        (Method::Get, Box::new(status_current)),
+    );
+    router.add(
+        "/api/v0/announcement/current",
+        (Method::Get, Box::new(announcement_current)),
+    );
 
-    Server::http(listen).unwrap().handle(move |req: Request, mut res: Response| {
-        let (match_result, get_params_string) = {
-            let uri_str = match req.uri {
-                RequestUri::AbsolutePath(ref p) => p,
-                _ => panic!()
-            };
-            let (path_str, get_params_str) = split_uri(uri_str);
-            (router.recognize(path_str), get_params_str.map(|s| String::from(s)))
-        };
-        match match_result {
-            Ok(Match{ handler: tup, params }) => {
-                let &(ref method, ref handler): &(Method, Box<Handler>) = tup;
-                let authenticated = match pass_cookie {
-                    None =>
-                        true,
-                    Some((ref pass_str, ref cookie)) =>
-                         check_authentication(&req, pass_str, cookie)
+    Server::http(listen)
+        .unwrap()
+        .handle(move |req: Request, mut res: Response| {
+            let (match_result, get_params_string) = {
+                let uri_str = match req.uri {
+                    RequestUri::AbsolutePath(ref p) => p,
+                    _ => panic!(),
                 };
-                if let Some((_, ref cookie)) = pass_cookie {
-                    if authenticated {
-                        set_auth_cookie(&mut res, cookie.as_str());
+                let (path_str, get_params_str) = split_uri(uri_str);
+                (
+                    router.recognize(path_str),
+                    get_params_str.map(|s| String::from(s)),
+                )
+            };
+            match match_result {
+                Ok(Match {
+                    handler: tup,
+                    params,
+                }) => {
+                    let &(ref method, ref handler): &(Method, Box<Handler>) = tup;
+                    let authenticated = match pass_cookie {
+                        None => true,
+                        Some((ref pass_str, ref cookie)) => {
+                            check_authentication(&req, pass_str, cookie)
+                        }
+                    };
+                    if let Some((_, ref cookie)) = pass_cookie {
+                        if authenticated {
+                            set_auth_cookie(&mut res, cookie.as_str());
+                        } else {
+                            clear_auth_cookie(&mut res);
+                        }
+                    }
+                    if *method == req.method {
+                        let pr = ParsedRequest {
+                            req: req,
+                            path_params: params,
+                            // would be nicer to just put a reference into req here, but idk how:
+                            get_params_str: get_params_string,
+                            authenticated: authenticated,
+                        };
+                        handler.handle(
+                            pr,
+                            res,
+                            shared_con.clone(),
+                            presence_tracker.clone(),
+                            mqtt_arc.clone(),
+                        );
                     } else {
-                        clear_auth_cookie(&mut res);
+                        send_status(res, StatusCode::MethodNotAllowed);
                     }
                 }
-                if *method == req.method {
-                    let pr = ParsedRequest {
-                        req: req,
-                        path_params: params,
-                        // would be nicer to just put a reference into req here, but idk how:
-                        get_params_str: get_params_string,
-                        authenticated: authenticated
-                    };
-                    handler.handle(pr, res, shared_con.clone(), presence_tracker.clone(), mqtt_arc.clone());
-                } else {
-                    send_status(res, StatusCode::MethodNotAllowed);
-                }
-            },
-            Err(_) =>
-                send_status(res, StatusCode::NotFound)
-        };
-    }).unwrap();
+                Err(_) => send_status(res, StatusCode::NotFound),
+            };
+        })
+        .unwrap();
 }
 
 /*
@@ -135,12 +184,15 @@ fn public_api_strip(json: &mut Json) {
 }
 
 fn generate_cookie(cookie_salt: &Salt, password: &str) -> String {
-    let mut key = vec!(0; 32);
-    pwhash::derive_key(key.as_mut_slice(),
-                       password.as_bytes(),
-                       cookie_salt,
-                       pwhash::OPSLIMIT_INTERACTIVE,
-                       pwhash::MEMLIMIT_INTERACTIVE).unwrap();
+    let mut key = vec![0; 32];
+    pwhash::derive_key(
+        key.as_mut_slice(),
+        password.as_bytes(),
+        cookie_salt,
+        pwhash::OPSLIMIT_INTERACTIVE,
+        pwhash::MEMLIMIT_INTERACTIVE,
+    )
+    .unwrap();
     (&key[..]).to_hex()
 }
 
@@ -154,21 +206,23 @@ fn check_authentication(req: &Request, password: &str, cookie_value: &str) -> bo
     match req.headers.get::<header::Authorization<header::Basic>>() {
         Some(&header::Authorization(header::Basic {
             username: _,
-            password: Some(ref tried_password)
-        })) => {
-            tried_password == password
-        },
-        _ => false
+            password: Some(ref tried_password),
+        })) => tried_password == password,
+        _ => false,
     }
 }
 
 fn set_auth_cookie(res: &mut Response, cookie: &str) {
     // cookie expires in 1 to 2 years
     let expiration_year = Utc::today().year() + 2;
-    let expire_time = Utc.ymd(expiration_year, 1, 1).and_hms(0, 0, 0).format("%a, %m %b %Y %H:%M:%S GMT");
-    res.headers_mut().set(header::SetCookie(vec![
-        format!("clubstatusd-password={}; Path=/; Expires={}", cookie, expire_time)
-    ]));
+    let expire_time = Utc
+        .ymd(expiration_year, 1, 1)
+        .and_hms(0, 0, 0)
+        .format("%a, %m %b %Y %H:%M:%S GMT");
+    res.headers_mut().set(header::SetCookie(vec![format!(
+        "clubstatusd-password={}; Path=/; Expires={}",
+        cookie, expire_time
+    )]));
 }
 
 fn clear_auth_cookie(res: &mut Response) {
@@ -185,7 +239,7 @@ fn parse_get_params<'a>(get_params_str: Option<String>) -> GetParams<'a> {
                 let value = split.next().map(|s| urlparse::unquote_plus(s).unwrap());
                 params.insert(key, value);
             }
-        },
+        }
         None => {}
     };
     params
@@ -212,8 +266,13 @@ fn send(mut res: Response, status: StatusCode, msg: &[u8]) {
     res.send(msg).unwrap();
 }
 
-fn api_versions(_pr: ParsedRequest, mut res: Response, _shared_con: Arc<Mutex<DbCon>>,
-                _: Arc<Mutex<Sender<String>>>, _: Arc<Mutex<Option<Sender<TypedAction>>>>) {
+fn api_versions(
+    _pr: ParsedRequest,
+    mut res: Response,
+    _shared_con: Arc<Mutex<DbCon>>,
+    _: Arc<Mutex<Sender<String>>>,
+    _: Arc<Mutex<Option<Sender<TypedAction>>>>,
+) {
     let mut obj = Object::new();
     obj.insert("versions".into(), [0].to_json());
     {
@@ -229,9 +288,13 @@ fn api_versions(_pr: ParsedRequest, mut res: Response, _shared_con: Arc<Mutex<Db
 /*
  * PUT
  */
-fn create_action(mut pr: ParsedRequest, mut res: Response, shared_con: Arc<Mutex<DbCon>>,
-                 presence_tracker: Arc<Mutex<Sender<String>>>,
-                 mqtt: Arc<Mutex<Option<Sender<TypedAction>>>>) {
+fn create_action(
+    mut pr: ParsedRequest,
+    mut res: Response,
+    shared_con: Arc<Mutex<DbCon>>,
+    presence_tracker: Arc<Mutex<Sender<String>>>,
+    mqtt: Arc<Mutex<Option<Sender<TypedAction>>>>,
+) {
     if !pr.authenticated {
         send_unauthorized(res);
         return;
@@ -242,8 +305,7 @@ fn create_action(mut pr: ParsedRequest, mut res: Response, shared_con: Arc<Mutex
     let (action_buf, _) = action_buf.split_at(bytes_read);
     let action_str = str::from_utf8(action_buf).unwrap();
     match Json::from_str(action_str) {
-        Err(_) =>
-            send_status(res, StatusCode::BadRequest),
+        Err(_) => send_status(res, StatusCode::BadRequest),
         Ok(action_json) => {
             let now = Utc::now().timestamp();
             match json_to_object(action_json, now) {
@@ -259,16 +321,14 @@ fn create_action(mut pr: ParsedRequest, mut res: Response, shared_con: Arc<Mutex
                             let mut resp_str = format!("{}", action_id);
                             resp_str.push('\n');
                             res.send(resp_str.as_bytes()).unwrap();
-                        },
-                        None => {
-                            send(res, StatusCode::BadRequest, "bad request".as_bytes())
                         }
+                        None => send(res, StatusCode::BadRequest, "bad request".as_bytes()),
                     }
                     transaction.commit().unwrap();
-                },
+                }
                 Ok(RequestObject::PresenceRequest(username)) => {
                     presence_tracker.lock().unwrap().send(username).unwrap();
-                },
+                }
                 Err(msg) => {
                     send(res, StatusCode::BadRequest, msg.as_bytes());
                 }
@@ -280,8 +340,13 @@ fn create_action(mut pr: ParsedRequest, mut res: Response, shared_con: Arc<Mutex
 /*
  * GET
  */
-fn status_current(pr: ParsedRequest, mut res: Response, shared_con: Arc<Mutex<DbCon>>,
-                  _: Arc<Mutex<Sender<String>>>, _: Arc<Mutex<Option<Sender<TypedAction>>>>) {
+fn status_current(
+    pr: ParsedRequest,
+    mut res: Response,
+    shared_con: Arc<Mutex<DbCon>>,
+    _: Arc<Mutex<Sender<String>>>,
+    _: Arc<Mutex<Option<Sender<TypedAction>>>>,
+) {
     let get_params = parse_get_params(pr.get_params_str);
     let public_api = get_params.contains_key("public");
     if !public_api && !pr.authenticated {
@@ -291,11 +356,16 @@ fn status_current(pr: ParsedRequest, mut res: Response, shared_con: Arc<Mutex<Db
     let mut obj = Object::new();
     let con = shared_con.lock().unwrap();
     if !public_api {
-        obj.insert("last".into(), db::status::get_last(&*con).unwrap().to_json());
+        obj.insert(
+            "last".into(),
+            db::status::get_last(&*con).unwrap().to_json(),
+        );
     }
 
     let mut changed_action = if public_api {
-        db::status::get_last_changed_public(&*con).unwrap().to_json()
+        db::status::get_last_changed_public(&*con)
+            .unwrap()
+            .to_json()
     } else {
         db::status::get_last_changed(&*con).unwrap().to_json()
     };
@@ -316,8 +386,13 @@ fn status_current(pr: ParsedRequest, mut res: Response, shared_con: Arc<Mutex<Db
     res.send(resp_str.as_bytes()).unwrap();
 }
 
-fn announcement_current(pr: ParsedRequest, mut res: Response, shared_con: Arc<Mutex<DbCon>>,
-                        _: Arc<Mutex<Sender<String>>>, _: Arc<Mutex<Option<Sender<TypedAction>>>>) {
+fn announcement_current(
+    pr: ParsedRequest,
+    mut res: Response,
+    shared_con: Arc<Mutex<DbCon>>,
+    _: Arc<Mutex<Sender<String>>>,
+    _: Arc<Mutex<Option<Sender<TypedAction>>>>,
+) {
     let get_params = parse_get_params(pr.get_params_str);
     let public_api = get_params.contains_key("public");
     if !public_api && !pr.authenticated {
@@ -346,11 +421,10 @@ fn announcement_current(pr: ParsedRequest, mut res: Response, shared_con: Arc<Mu
     res.send(resp_str.as_bytes()).unwrap();
 }
 
-
 #[derive(Debug)]
 pub enum RangeExpr<T> {
     Single(T),
-    Range(T, T)
+    Range(T, T),
 }
 
 impl<T: PartialOrd> RangeExpr<T> {
@@ -367,31 +441,32 @@ impl<T: PartialOrd> RangeExpr<T> {
     fn is_single(&self) -> bool {
         match self {
             &RangeExpr::Single(_) => true,
-            &RangeExpr::Range(_, _) => false
+            &RangeExpr::Range(_, _) => false,
         }
     }
 
-    fn map<F, R, E>(&self, f: F) -> Result<RangeExpr<R>, E> where F: Fn(&T) -> Result<R, E> {
+    fn map<F, R, E>(&self, f: F) -> Result<RangeExpr<R>, E>
+    where
+        F: Fn(&T) -> Result<R, E>,
+    {
         Ok(match self {
             &RangeExpr::Single(ref first) => RangeExpr::Single(try!(f(first))),
-            &RangeExpr::Range(ref first, ref second) => RangeExpr::Range(try!(f(first)), try!(f(second)))
+            &RangeExpr::Range(ref first, ref second) => {
+                RangeExpr::Range(try!(f(first)), try!(f(second)))
+            }
         })
     }
 }
 
-impl<T: FromStr+PartialOrd> FromStr for RangeExpr<T> {
+impl<T: FromStr + PartialOrd> FromStr for RangeExpr<T> {
     type Err = T::Err;
 
     fn from_str(s: &str) -> Result<Self, T::Err> {
         let mut parts = s.splitn(2, ':');
         let start = try!(parts.next().unwrap().parse());
         Ok(match parts.next() {
-            None => {
-                RangeExpr::Single(start)
-            },
-            Some(e) => {
-                RangeExpr::range(start, try!(e.parse()))
-            }
+            None => RangeExpr::Single(start),
+            Some(e) => RangeExpr::range(start, try!(e.parse())),
         })
     }
 }
@@ -399,7 +474,7 @@ impl<T: FromStr+PartialOrd> FromStr for RangeExpr<T> {
 #[derive(Debug, PartialEq)]
 pub enum IdExpr {
     Int(u64),
-    Last
+    Last,
 }
 
 impl PartialOrd for IdExpr {
@@ -410,7 +485,7 @@ impl PartialOrd for IdExpr {
             (&Int(i1), &Int(i2)) => i1.partial_cmp(&i2),
             (&Int(_), &Last) => Some(Ordering::Less),
             (&Last, &Int(_)) => Some(Ordering::Greater),
-            (&Last, &Last) => Some(Ordering::Equal)
+            (&Last, &Last) => Some(Ordering::Equal),
         }
     }
 }
@@ -420,12 +495,8 @@ impl FromStr for IdExpr {
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
-            "last" => {
-                Ok(IdExpr::Last)
-            },
-            _ => {
-                Ok(IdExpr::Int(s.parse().unwrap()))
-            }
+            "last" => Ok(IdExpr::Last),
+            _ => Ok(IdExpr::Int(s.parse().unwrap())),
         }
     }
 }
@@ -433,11 +504,16 @@ impl FromStr for IdExpr {
 #[derive(Debug, PartialEq)]
 pub enum Take {
     First,
-    Last
+    Last,
 }
 
-fn query(pr: ParsedRequest, mut res: Response, shared_con: Arc<Mutex<DbCon>>,
-         _: Arc<Mutex<Sender<String>>>, _: Arc<Mutex<Option<Sender<TypedAction>>>>) {
+fn query(
+    pr: ParsedRequest,
+    mut res: Response,
+    shared_con: Arc<Mutex<DbCon>>,
+    _: Arc<Mutex<Sender<String>>>,
+    _: Arc<Mutex<Option<Sender<TypedAction>>>>,
+) {
     if !pr.authenticated {
         send_unauthorized(res);
         return;
@@ -458,66 +534,74 @@ fn query(pr: ParsedRequest, mut res: Response, shared_con: Arc<Mutex<DbCon>>,
     let id: RangeExpr<IdExpr> = match get_params.get("id") {
         None => RangeExpr::range(IdExpr::Int(0), IdExpr::Last),
         Some(&None) => RangeExpr::range(IdExpr::Int(0), IdExpr::Last),
-        Some(&Some(ref s)) => {
-            match s.parse() {
-                Ok(id) => id,
-                Err(_) => {
-                    send(res, StatusCode::BadRequest, "bad parameter: id".as_bytes());
-                    return;
-                }
+        Some(&Some(ref s)) => match s.parse() {
+            Ok(id) => id,
+            Err(_) => {
+                send(res, StatusCode::BadRequest, "bad parameter: id".as_bytes());
+                return;
             }
-        }
+        },
     };
     let time: RangeExpr<i64> = match get_params.get("time") {
         None => RangeExpr::range(i64::min_value(), i64::max_value()),
         Some(&None) => RangeExpr::range(i64::min_value(), i64::max_value()),
-        Some(&Some(ref s)) => {
-            match s.parse::<RangeExpr<String>>() {
-                Ok(t) => {
-                    let now = Utc::now().timestamp();
-                    match t.map(|s| parse_time_string(&*s, now)) {
-                        Ok(m) => m,
-                        Err(_) => {
-                            send(res, StatusCode::BadRequest, "bad parameter: time".as_bytes());
-                            return;
-                        }
+        Some(&Some(ref s)) => match s.parse::<RangeExpr<String>>() {
+            Ok(t) => {
+                let now = Utc::now().timestamp();
+                match t.map(|s| parse_time_string(&*s, now)) {
+                    Ok(m) => m,
+                    Err(_) => {
+                        send(
+                            res,
+                            StatusCode::BadRequest,
+                            "bad parameter: time".as_bytes(),
+                        );
+                        return;
                     }
-                },
-                Err(_) => {
-                    send(res, StatusCode::BadRequest, "bad parameter: time".as_bytes());
-                    return;
                 }
             }
-        }
+            Err(_) => {
+                send(
+                    res,
+                    StatusCode::BadRequest,
+                    "bad parameter: time".as_bytes(),
+                );
+                return;
+            }
+        },
     };
     let count = match get_params.get("count") {
         None => 20,
         Some(&None) => 20,
-        Some(&Some(ref s)) => {
-            match s.parse() {
-                Ok(i) => i,
-                Err(_) => {
-                    send(res, StatusCode::BadRequest, "bad parameter: count".as_bytes());
-                    return;
-                }
+        Some(&Some(ref s)) => match s.parse() {
+            Ok(i) => i,
+            Err(_) => {
+                send(
+                    res,
+                    StatusCode::BadRequest,
+                    "bad parameter: count".as_bytes(),
+                );
+                return;
             }
-        }
+        },
     };
     let count: u64 = min(count, 100);
     let count = if id.is_single() { 1 } else { count };
     let take = match get_params.get("take") {
         None => Take::Last,
         Some(&None) => Take::Last,
-        Some(&Some(ref s)) => {
-            match &**s {
-                "first" => Take::First,
-                "last" => Take::Last,
-                _ => {
-                    send(res, StatusCode::BadRequest, "bad parameter: take".as_bytes());
-                    return;
-                }
+        Some(&Some(ref s)) => match &**s {
+            "first" => Take::First,
+            "last" => Take::Last,
+            _ => {
+                send(
+                    res,
+                    StatusCode::BadRequest,
+                    "bad parameter: take".as_bytes(),
+                );
+                return;
             }
-        }
+        },
     };
 
     //println!("type: {:?} id: {:?} time: {:?} count: {:?} take: {:?}", type_, id, time, count, take);
