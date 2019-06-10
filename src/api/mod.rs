@@ -14,7 +14,7 @@ use hyper::method::Method;
 use hyper::server::{Request, Response, Server};
 use hyper::status::StatusCode;
 use hyper::uri::RequestUri;
-use model::{json_to_object, parse_time_string, QueryActionType, RequestObject, TypedAction};
+use crate::model::{json_to_object, parse_time_string, QueryActionType, RequestObject, TypedAction};
 use route_recognizer::{Match, Params, Router};
 use rustc_serialize::hex::ToHex;
 use rustc_serialize::json::{Json, Object, ToJson};
@@ -22,9 +22,9 @@ use sodiumoxide::crypto::pwhash;
 use sodiumoxide::crypto::pwhash::Salt;
 use urlparse;
 
-use db;
-use db::DbCon;
-use model::Status;
+use crate::db;
+use crate::db::DbCon;
+use crate::model::Status;
 
 pub mod mqtt;
 
@@ -469,9 +469,9 @@ impl<T: PartialOrd> RangeExpr<T> {
         F: Fn(&T) -> Result<R, E>,
     {
         Ok(match self {
-            &RangeExpr::Single(ref first) => RangeExpr::Single(try!(f(first))),
+            &RangeExpr::Single(ref first) => RangeExpr::Single(f(first)?),
             &RangeExpr::Range(ref first, ref second) => {
-                RangeExpr::Range(try!(f(first)), try!(f(second)))
+                RangeExpr::Range(f(first)?, f(second)?)
             }
         })
     }
@@ -482,10 +482,10 @@ impl<T: FromStr + PartialOrd> FromStr for RangeExpr<T> {
 
     fn from_str(s: &str) -> Result<Self, T::Err> {
         let mut parts = s.splitn(2, ':');
-        let start = try!(parts.next().unwrap().parse());
+        let start = parts.next().unwrap().parse()?;
         Ok(match parts.next() {
             None => RangeExpr::Single(start),
-            Some(e) => RangeExpr::range(start, try!(e.parse())),
+            Some(e) => RangeExpr::range(start, e.parse()?),
         })
     }
 }
@@ -498,7 +498,7 @@ pub enum IdExpr {
 
 impl PartialOrd for IdExpr {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        use api::IdExpr::*;
+        use crate::api::IdExpr::*;
 
         match (self, other) {
             (&Int(i1), &Int(i2)) => i1.partial_cmp(&i2),

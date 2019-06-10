@@ -1,5 +1,5 @@
 #[allow(unused_imports)]
-use model::*;
+use crate::model::*;
 
 #[test]
 fn parse_time_string_tests() {

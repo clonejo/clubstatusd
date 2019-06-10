@@ -1,17 +1,3 @@
-extern crate chrono;
-extern crate clap;
-extern crate config;
-extern crate hyper;
-extern crate libc;
-extern crate regex;
-extern crate route_recognizer;
-extern crate rumqtt;
-extern crate rusqlite;
-extern crate rustc_serialize;
-extern crate sodiumoxide;
-extern crate time;
-extern crate urlparse;
-
 mod api;
 mod db;
 mod model;

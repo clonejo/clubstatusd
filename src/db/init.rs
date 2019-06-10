@@ -3,14 +3,14 @@ use std::path::Path;
 
 use rusqlite::{Connection, Error, Transaction};
 
-use db::DbStored;
-use model::*;
+use crate::db::DbStored;
+use crate::model::*;
 
 pub fn ensure_initialized(path: &Path) -> Result<(), Error> {
     match fs::metadata(path) {
         Err(_) => {
             println!("creating db at {:?}", path);
-            let mut con = try!(Connection::open(path));
+            let mut con = Connection::open(path)?;
             let transaction = con.transaction().unwrap();
             create_tables(&transaction);
             insert_initial_status(&transaction);

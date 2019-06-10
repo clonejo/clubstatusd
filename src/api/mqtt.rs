@@ -5,8 +5,8 @@ use std::time::Duration;
 
 use rumqtt::{MqttClient, MqttOptions, QoS, ReconnectOptions};
 
-use db::{status, DbCon};
-use model::*;
+use crate::db::{status, DbCon};
+use crate::model::*;
 
 fn publish_status(action: &StatusAction, mqtt_client: &mut MqttClient, topic_prefix: &str) {
     use rustc_serialize::json::ToJson;

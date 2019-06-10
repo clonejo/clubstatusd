@@ -4,12 +4,12 @@ use std::sync::mpsc::Sender;
 use rusqlite::types::{FromSql, FromSqlError, FromSqlResult, ToSql, ToSqlOutput, Value, ValueRef};
 use rusqlite::{Connection, Error, Transaction};
 
-use api::{IdExpr, RangeExpr, Take};
-use model::*;
+use crate::api::{IdExpr, RangeExpr, Take};
+use crate::model::*;
 
 mod init;
 
-pub use db::init::ensure_initialized;
+pub use crate::db::init::ensure_initialized;
 
 pub type DbCon = Connection;
 

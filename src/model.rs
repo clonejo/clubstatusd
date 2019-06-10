@@ -2,7 +2,7 @@ use chrono::Utc;
 use regex::Regex;
 use rustc_serialize::json::{Json, Object, ToJson};
 
-use db::DbStored;
+use crate::db::DbStored;
 
 #[derive(Clone, Debug)]
 pub struct BaseAction {
@@ -254,8 +254,8 @@ fn get_method(obj: &Object) -> Result<AnnouncementMethod, String> {
 }
 
 fn get_from_to(obj: &Object, now: i64) -> Result<(i64, i64), String> {
-    let from = try!(parse_time(obj.get("from").unwrap(), now));
-    let to = try!(parse_time(obj.get("to").unwrap(), now));
+    let from = parse_time(obj.get("from").unwrap(), now)?;
+    let to = parse_time(obj.get("to").unwrap(), now)?;
     if from > to {
         return Err("from must be <= to".into());
     }
@@ -291,7 +291,7 @@ pub fn parse_time_string(s: &str, now: i64) -> Result<i64, String> {
                 }
                 Some(captures) => {
                     let mut i: i64 =
-                        try!(parse_u64_string(captures.get(2).unwrap().as_str())) as i64;
+                        parse_u64_string(captures.get(2).unwrap().as_str())? as i64;
                     match captures.get(1).unwrap().as_str() {
                         "+" => {}
                         "-" => {
@@ -341,7 +341,7 @@ pub fn json_to_object(json: Json, now: i64) -> Result<RequestObject, String> {
     let base_action = BaseAction::new(note);
     match obj.get("type").unwrap().as_string().unwrap() {
         "status" => {
-            let user = try!(get_checked_user(obj));
+            let user = get_checked_user(obj)?;
             Ok(RequestObject::Action(Box::new(StatusAction {
                 action: base_action,
                 user: user,
@@ -349,15 +349,15 @@ pub fn json_to_object(json: Json, now: i64) -> Result<RequestObject, String> {
             })))
         }
         "announcement" => {
-            let user = try!(get_checked_user(obj));
-            let method = try!(get_method(obj));
+            let user = get_checked_user(obj)?;
+            let method = get_method(obj)?;
             match method {
                 AnnouncementMethod::New => {
-                    let (from, to) = try!(get_from_to(obj, now));
+                    let (from, to) = get_from_to(obj, now)?;
                     if from < now {
                         return Err("from must be >= now".into());
                     }
-                    let public = try!(get_public(obj));
+                    let public = get_public(obj)?;
                     Ok(RequestObject::Action(Box::new(AnnouncementAction {
                         action: base_action,
                         user: user,
@@ -371,7 +371,7 @@ pub fn json_to_object(json: Json, now: i64) -> Result<RequestObject, String> {
                 AnnouncementMethod::Mod => {
                     let aid = obj.get("aid").unwrap().as_u64().unwrap();
                     let (from, to) = get_from_to(obj, now).unwrap();
-                    let public = try!(get_public(obj));
+                    let public = get_public(obj)?;
                     Ok(RequestObject::Action(Box::new(AnnouncementAction {
                         action: base_action,
                         user: user,
@@ -397,7 +397,7 @@ pub fn json_to_object(json: Json, now: i64) -> Result<RequestObject, String> {
             }
         }
         "presence" => {
-            let user = try!(get_checked_user(obj));
+            let user = get_checked_user(obj)?;
             Ok(RequestObject::PresenceRequest(user))
         }
         _ => Err("Unknown action type\n".into()),
