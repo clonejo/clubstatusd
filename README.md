@@ -6,7 +6,10 @@ people announcing their future stay) and presence (people currently staying).
 
 What data the daemon tracks and how the API looks is documented in the [Specification](api-specification.md).
 
-As of 0.2.0 clubstatusd can publish status and presence changes via MQTT.
+## Integrations
+* Publish status and presence changes via MQTT
+* Provide a [SpaceAPI](http://spaceapi.net/) 0.13 compatible endpoint at
+  `/spaceapi` if configured.
 
 # Dependencies
 * Rust and Cargo
