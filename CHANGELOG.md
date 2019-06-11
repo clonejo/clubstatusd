@@ -25,6 +25,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## v0.2.5 - 2017-05-27
 - push last status action json to mqtt
+- This is the last version to build with rustc 1.24.1, so it should still
+  compile on Debian Stretch.
 
 ## v0.2.4 - 2017-05-06
 - update rusqlite to 0.11.0 to fix pkg_build problem
