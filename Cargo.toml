@@ -1,6 +1,6 @@
 [package]
 name = "clubstatusd"
-version = "0.2.5"
+version = "0.3.1"
 authors = ["clonejo <clonejo@shakik.de>"]
 license = "Apache-2.0"
 edition = "2018"
