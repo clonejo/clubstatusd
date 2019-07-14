@@ -242,6 +242,7 @@ impl DbStored for AnnouncementAction {
                                 }) => return None,
                                 Some(a) => a,
                             };
+                            self.action.note = last_action.action.note;
                             self.from = last_action.from;
                             self.to = last_action.to;
                             self.public = last_action.public;

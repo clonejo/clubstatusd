@@ -6,6 +6,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## v0.3.2 - 2019-07-15
+### Changed
+- Deleted announcements now contain the note from before the deletion.
+
 ## v0.3.1 - 2019-07-14
 ### Added
 - Push announcement changes (new, changed, deleted) to mqtt (`<prefix>/announcement/<aid>`)
