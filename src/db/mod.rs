@@ -176,7 +176,7 @@ pub mod status {
  */
 
 impl DbStored for AnnouncementAction {
-    fn store(&mut self, tx: &Transaction, _mqtt: &Option<Sender<TypedAction>>) -> Option<u64> {
+    fn store(&mut self, tx: &Transaction, mqtt: &Option<Sender<TypedAction>>) -> Option<u64> {
         match self.action.id {
             None => {
                 match self.method {
@@ -200,6 +200,9 @@ impl DbStored for AnnouncementAction {
                             .unwrap();
                             self.action.id = Some(action_id);
                             self.aid = Some(action_id);
+                            if let &Some(ref m) = mqtt {
+                                m.send(TypedAction::Announcement(self.clone())).unwrap();
+                            }
                             Some(action_id)
                         }
                         Some(_) => None,
@@ -221,6 +224,9 @@ impl DbStored for AnnouncementAction {
                                     &[&(action_id as i64), &1, &(aid as i64),
                                       &self.user, &self.from, &self.to, &(self.public as i64)]).unwrap();
                             self.action.id = Some(action_id);
+                            if let &Some(ref m) = mqtt {
+                                m.send(TypedAction::Announcement(self.clone())).unwrap();
+                            }
                             Some(action_id)
                         }
                     },
@@ -244,6 +250,9 @@ impl DbStored for AnnouncementAction {
                                     &[&(action_id as i64), &2, &(aid as i64),
                                       &self.user, &self.from, &self.to, &(self.public as i64)]).unwrap();
                             self.action.id = Some(action_id);
+                            if let &Some(ref m) = mqtt {
+                                m.send(TypedAction::Announcement(self.clone())).unwrap();
+                            }
                             Some(action_id)
                         }
                     },

@@ -14,7 +14,6 @@ use hyper::method::Method;
 use hyper::server::{Request, Response, Server};
 use hyper::status::StatusCode;
 use hyper::uri::RequestUri;
-use crate::model::{json_to_object, parse_time_string, QueryActionType, RequestObject, TypedAction};
 use route_recognizer::{Match, Params, Router};
 use rustc_serialize::hex::ToHex;
 use rustc_serialize::json::{Json, Object, ToJson};
@@ -25,6 +24,9 @@ use urlparse;
 use crate::db;
 use crate::db::DbCon;
 use crate::model::Status;
+use crate::model::{
+    json_to_object, parse_time_string, QueryActionType, RequestObject, TypedAction,
+};
 
 pub mod mqtt;
 
@@ -470,9 +472,7 @@ impl<T: PartialOrd> RangeExpr<T> {
     {
         Ok(match self {
             &RangeExpr::Single(ref first) => RangeExpr::Single(f(first)?),
-            &RangeExpr::Range(ref first, ref second) => {
-                RangeExpr::Range(f(first)?, f(second)?)
-            }
+            &RangeExpr::Range(ref first, ref second) => RangeExpr::Range(f(first)?, f(second)?),
         })
     }
 }

@@ -4,13 +4,12 @@ use std::thread;
 use std::time::Duration;
 
 use rumqtt::{MqttClient, MqttOptions, QoS, ReconnectOptions};
+use rustc_serialize::json::ToJson;
 
 use crate::db::{status, DbCon};
 use crate::model::*;
 
 fn publish_status(action: &StatusAction, mqtt_client: &mut MqttClient, topic_prefix: &str) {
-    use rustc_serialize::json::ToJson;
-
     {
         let payload = match action.status {
             Status::Public => "public",
@@ -39,16 +38,16 @@ fn publish_status(action: &StatusAction, mqtt_client: &mut MqttClient, topic_pre
 }
 
 fn publish_announcement(
-    _action: &AnnouncementAction,
+    action: &AnnouncementAction,
     mqtt_client: &mut MqttClient,
     topic_prefix: &str,
 ) {
     mqtt_client
         .publish(
-            format!("{}announcement", topic_prefix).as_str(),
+            format!("{}announcement/{}", topic_prefix, action.aid.unwrap()).as_str(),
             QoS::AtLeastOnce,
             false,
-            "not_implemented",
+            action.to_json().to_string(),
         )
         .unwrap();
 }
