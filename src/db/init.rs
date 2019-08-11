@@ -7,17 +7,14 @@ use crate::db::DbStored;
 use crate::model::*;
 
 pub fn ensure_initialized(path: &Path) -> Result<(), Error> {
-    match fs::metadata(path) {
-        Err(_) => {
-            println!("creating db at {:?}", path);
-            let mut con = Connection::open(path)?;
-            let transaction = con.transaction().unwrap();
-            create_tables(&transaction);
-            insert_initial_status(&transaction);
-            insert_initial_presence(&transaction);
-            transaction.commit().unwrap();
-        }
-        Ok(_) => {}
+    if fs::metadata(path).is_err() {
+        println!("creating db at {:?}", path);
+        let mut con = Connection::open(path)?;
+        let transaction = con.transaction().unwrap();
+        create_tables(&transaction);
+        insert_initial_status(&transaction);
+        insert_initial_presence(&transaction);
+        transaction.commit().unwrap();
     }
     Ok(())
 }

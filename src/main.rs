@@ -42,11 +42,11 @@ fn main() {
 
     let db_path_str = conf
         .get_str("database_path")
-        .unwrap_or(String::from("/var/local/clubstatusd/db.sqlite"));
+        .unwrap_or_else(|_| String::from("/var/local/clubstatusd/db.sqlite"));
     match db::connect(db_path_str.as_str()) {
         Ok(con) => {
             let password = match conf.get_str("password") {
-                Ok(s) => Some(String::from(s)),
+                Ok(s) => Some(s),
                 Err(ConfigError::NotFound(_)) => {
                     writeln!(
                         &mut stderr(),
@@ -55,7 +55,8 @@ fn main() {
                     .unwrap();
                     None
                 }
-                Err(_) => {
+                Err(e) => {
+                    dbg!(e);
                     panic!();
                 }
             };
@@ -70,7 +71,7 @@ fn main() {
 
             let shared_con = Arc::new(Mutex::new(con));
 
-            let mqtt_server = conf.get_str("mqtt.server").ok().map(|s| String::from(s));
+            let mqtt_server = conf.get_str("mqtt.server").ok();
             let port = conf.get_int("mqtt.port").unwrap_or(1883) as u16;
             let mqtt_topic_prefix = conf
                 .get_str("mqtt.topic_prefix")
@@ -87,7 +88,7 @@ fn main() {
 
             let listen_addr = conf
                 .get_str("listen")
-                .unwrap_or(String::from("localhost:8000"));
+                .unwrap_or_else(|_| String::from("localhost:8000"));
             api::run(
                 shared_con,
                 listen_addr.as_str(),

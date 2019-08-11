@@ -19,8 +19,8 @@ impl BaseAction {
     fn new_with_time(note: String, time: i64) -> BaseAction {
         BaseAction {
             id: None,
-            time: time,
-            note: note,
+            time,
+            note,
         }
     }
 
@@ -70,9 +70,9 @@ impl ToJson for Status {
     fn to_json(&self) -> Json {
         Json::String(
             match self {
-                &Status::Public => "public",
-                &Status::Private => "private",
-                &Status::Closed => "closed",
+                Status::Public => "public",
+                Status::Private => "private",
+                Status::Closed => "closed",
             }
             .into(),
         )
@@ -83,8 +83,8 @@ impl StatusAction {
     pub fn new(note: String, time: i64, user: String, status: Status) -> Self {
         StatusAction {
             action: BaseAction::new_with_time(note, time),
-            user: user,
-            status: status,
+            user,
+            status,
         }
     }
 }
@@ -121,9 +121,9 @@ impl ToJson for AnnouncementMethod {
     fn to_json(&self) -> Json {
         Json::String(
             match self {
-                &AnnouncementMethod::New => "new",
-                &AnnouncementMethod::Mod => "mod",
-                &AnnouncementMethod::Del => "del",
+                AnnouncementMethod::New => "new",
+                AnnouncementMethod::Mod => "mod",
+                AnnouncementMethod::Del => "del",
             }
             .into(),
         )
@@ -158,7 +158,7 @@ impl PresenceAction {
     pub fn new_with_time(note: String, time: i64, users: Vec<PresentUser>) -> Self {
         PresenceAction {
             action: BaseAction::new_with_time(note, time),
-            users: users,
+            users,
         }
     }
 }
@@ -206,20 +206,20 @@ impl ToJson for PresenceAction {
 }
 
 pub trait Action: DbStored + ToJson {
-    fn get_base_action<'a>(&'a self) -> &'a BaseAction;
+    fn get_base_action(&self) -> &BaseAction;
 }
 impl Action for StatusAction {
-    fn get_base_action<'a>(&'a self) -> &'a BaseAction {
+    fn get_base_action(&self) -> &BaseAction {
         &self.action
     }
 }
 impl Action for AnnouncementAction {
-    fn get_base_action<'a>(&'a self) -> &'a BaseAction {
+    fn get_base_action(&self) -> &BaseAction {
         &self.action
     }
 }
 impl Action for PresenceAction {
-    fn get_base_action<'a>(&'a self) -> &'a BaseAction {
+    fn get_base_action(&self) -> &BaseAction {
         &self.action
     }
 }
@@ -238,7 +238,7 @@ impl ToJson for Box<Action> {
 
 fn get_checked_user(obj: &Object) -> Result<String, String> {
     let user = obj.get("user").unwrap().as_string().unwrap().trim();
-    if user.len() == 0 || user.len() > 15 {
+    if user.is_empty() || user.len() > 15 {
         return Err("Bad username, unicode chars, 1 to 15 bytes\n".into());
     }
     Ok(String::from(user))
@@ -263,10 +263,10 @@ fn get_from_to(obj: &Object, now: i64) -> Result<(i64, i64), String> {
 }
 
 pub fn parse_time(json: &Json, now: i64) -> Result<i64, String> {
-    match json {
-        &Json::I64(t) => Ok(t),
-        &Json::U64(t) => Ok(t as i64),
-        &Json::String(ref s) => parse_time_string(s, now),
+    match *json {
+        Json::I64(t) => Ok(t),
+        Json::U64(t) => Ok(t as i64),
+        Json::String(ref s) => parse_time_string(s, now),
         _ => Err("bad time specification (wrong type)".into()),
     }
 }
@@ -277,21 +277,16 @@ fn parse_u64_string(s: &str) -> Result<u64, String> {
 
 pub fn parse_time_string(s: &str, now: i64) -> Result<i64, String> {
     match s.parse::<i64>() {
-        Ok(i) => {
-            return Ok(i);
-        }
+        Ok(i) => Ok(i),
         Err(_) => {
             if s == "now" {
                 return Ok(now);
             }
             let re = Regex::new(r"^now([+-])(\d+)$").unwrap();
             match re.captures(s) {
-                None => {
-                    return Err("bad time specification".into());
-                }
+                None => Err("bad time specification".into()),
                 Some(captures) => {
-                    let mut i: i64 =
-                        parse_u64_string(captures.get(2).unwrap().as_str())? as i64;
+                    let mut i: i64 = parse_u64_string(captures.get(2).unwrap().as_str())? as i64;
                     match captures.get(1).unwrap().as_str() {
                         "+" => {}
                         "-" => {
@@ -301,7 +296,7 @@ pub fn parse_time_string(s: &str, now: i64) -> Result<i64, String> {
                             panic!("should be impossible");
                         }
                     }
-                    return Ok(now + i);
+                    Ok(now + i)
                 }
             }
         }
@@ -344,7 +339,7 @@ pub fn json_to_object(json: Json, now: i64) -> Result<RequestObject, String> {
             let user = get_checked_user(obj)?;
             Ok(RequestObject::Action(Box::new(StatusAction {
                 action: base_action,
-                user: user,
+                user,
                 status: Status::from_str(obj.get("status").unwrap().as_string().unwrap()).unwrap(),
             })))
         }
@@ -360,12 +355,12 @@ pub fn json_to_object(json: Json, now: i64) -> Result<RequestObject, String> {
                     let public = get_public(obj)?;
                     Ok(RequestObject::Action(Box::new(AnnouncementAction {
                         action: base_action,
-                        user: user,
-                        method: method,
+                        user,
+                        method,
                         aid: None,
-                        from: from,
-                        to: to,
-                        public: public,
+                        from,
+                        to,
+                        public,
                     })))
                 }
                 AnnouncementMethod::Mod => {
@@ -374,20 +369,20 @@ pub fn json_to_object(json: Json, now: i64) -> Result<RequestObject, String> {
                     let public = get_public(obj)?;
                     Ok(RequestObject::Action(Box::new(AnnouncementAction {
                         action: base_action,
-                        user: user,
-                        method: method,
+                        user,
+                        method,
                         aid: Some(aid),
-                        from: from,
-                        to: to,
-                        public: public,
+                        from,
+                        to,
+                        public,
                     })))
                 }
                 AnnouncementMethod::Del => {
                     let aid = obj.get("aid").unwrap().as_u64().unwrap();
                     Ok(RequestObject::Action(Box::new(AnnouncementAction {
                         action: base_action,
-                        user: user,
-                        method: method,
+                        user,
+                        method,
                         aid: Some(aid),
                         from: 0,       // overwritten by DbStored::store()
                         to: 0,         // overwritten by DbStored::store()

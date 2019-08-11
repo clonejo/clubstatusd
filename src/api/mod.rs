@@ -136,10 +136,7 @@ pub fn run(
                     _ => panic!(),
                 };
                 let (path_str, get_params_str) = split_uri(uri_str);
-                (
-                    router.recognize(path_str),
-                    get_params_str.map(|s| String::from(s)),
-                )
+                (router.recognize(path_str), get_params_str.map(String::from))
             };
             match match_result {
                 Ok(Match {
@@ -162,11 +159,11 @@ pub fn run(
                     }
                     if *method == req.method {
                         let pr = ParsedRequest {
-                            req: req,
+                            req,
                             path_params: params,
                             // would be nicer to just put a reference into req here, but idk how:
                             get_params_str: get_params_string,
-                            authenticated: authenticated,
+                            authenticated,
                         };
                         handler.handle(
                             pr,
@@ -217,10 +214,11 @@ fn generate_cookie(cookie_salt: &Salt, password: &str) -> String {
     (&key[..]).to_hex()
 }
 
+#[allow(clippy::unneeded_field_pattern)]
 fn check_authentication(req: &Request, password: &str, cookie_value: &str) -> bool {
     if let Some(cookies) = req.headers.get::<header::Cookie>() {
         let correct_cookie = format!("clubstatusd-password={}", cookie_value);
-        if cookies.iter().any(|&ref c| c == correct_cookie.as_str()) {
+        if cookies.iter().any(|c| c == correct_cookie.as_str()) {
             return true;
         }
     }
@@ -252,17 +250,14 @@ fn clear_auth_cookie(res: &mut Response) {
 
 fn parse_get_params<'a>(get_params_str: Option<String>) -> GetParams<'a> {
     let mut params = HashMap::new();
-    match get_params_str {
-        Some(ref params_str) => {
-            for pair in params_str.split('&') {
-                let mut split = pair.splitn(2, '=');
-                let key = urlparse::unquote_plus(split.next().unwrap()).unwrap();
-                let value = split.next().map(|s| urlparse::unquote_plus(s).unwrap());
-                params.insert(key, value);
-            }
+    if let Some(ref params_str) = get_params_str {
+        for pair in params_str.split('&') {
+            let mut split = pair.splitn(2, '=');
+            let key = urlparse::unquote_plus(split.next().unwrap()).unwrap();
+            let value = split.next().map(|s| urlparse::unquote_plus(s).unwrap());
+            params.insert(key, value);
         }
-        None => {}
-    };
+    }
     params
 }
 
@@ -274,7 +269,7 @@ fn send_status(mut res: Response, status: StatusCode) {
 fn send_unauthorized(mut res: Response) {
     {
         let headers = res.headers_mut();
-        headers.set_raw("WWW-Authenticate", vec!["Basic".as_bytes().to_vec()]);
+        headers.set_raw("WWW-Authenticate", vec![b"Basic".to_vec()]);
     }
     send_status(res, StatusCode::Unauthorized);
 }
@@ -343,7 +338,7 @@ fn create_action(
                             resp_str.push('\n');
                             res.send(resp_str.as_bytes()).unwrap();
                         }
-                        None => send(res, StatusCode::BadRequest, "bad request".as_bytes()),
+                        None => send(res, StatusCode::BadRequest, b"bad request"),
                     }
                     transaction.commit().unwrap();
                 }
@@ -461,8 +456,8 @@ impl<T: PartialOrd> RangeExpr<T> {
 
     fn is_single(&self) -> bool {
         match self {
-            &RangeExpr::Single(_) => true,
-            &RangeExpr::Range(_, _) => false,
+            RangeExpr::Single(_) => true,
+            RangeExpr::Range(_, _) => false,
         }
     }
 
@@ -471,8 +466,8 @@ impl<T: PartialOrd> RangeExpr<T> {
         F: Fn(&T) -> Result<R, E>,
     {
         Ok(match self {
-            &RangeExpr::Single(ref first) => RangeExpr::Single(f(first)?),
-            &RangeExpr::Range(ref first, ref second) => RangeExpr::Range(f(first)?, f(second)?),
+            RangeExpr::Single(ref first) => RangeExpr::Single(f(first)?),
+            RangeExpr::Range(ref first, ref second) => RangeExpr::Range(f(first)?, f(second)?),
         })
     }
 }
@@ -544,7 +539,7 @@ fn query(
         "announcement" => QueryActionType::Announcement,
         "presence" => QueryActionType::Presence,
         _ => {
-            send(res, StatusCode::BadRequest, "bad action type".as_bytes());
+            send(res, StatusCode::BadRequest, b"bad action type");
             return;
         }
     };
@@ -556,7 +551,7 @@ fn query(
         Some(&Some(ref s)) => match s.parse() {
             Ok(id) => id,
             Err(_) => {
-                send(res, StatusCode::BadRequest, "bad parameter: id".as_bytes());
+                send(res, StatusCode::BadRequest, b"bad parameter: id");
                 return;
             }
         },
@@ -570,21 +565,13 @@ fn query(
                 match t.map(|s| parse_time_string(&*s, now)) {
                     Ok(m) => m,
                     Err(_) => {
-                        send(
-                            res,
-                            StatusCode::BadRequest,
-                            "bad parameter: time".as_bytes(),
-                        );
+                        send(res, StatusCode::BadRequest, b"bad parameter: time");
                         return;
                     }
                 }
             }
             Err(_) => {
-                send(
-                    res,
-                    StatusCode::BadRequest,
-                    "bad parameter: time".as_bytes(),
-                );
+                send(res, StatusCode::BadRequest, b"bad parameter: time");
                 return;
             }
         },
@@ -595,11 +582,7 @@ fn query(
         Some(&Some(ref s)) => match s.parse() {
             Ok(i) => i,
             Err(_) => {
-                send(
-                    res,
-                    StatusCode::BadRequest,
-                    "bad parameter: count".as_bytes(),
-                );
+                send(res, StatusCode::BadRequest, b"bad parameter: count");
                 return;
             }
         },
@@ -613,11 +596,7 @@ fn query(
             "first" => Take::First,
             "last" => Take::Last,
             _ => {
-                send(
-                    res,
-                    StatusCode::BadRequest,
-                    "bad parameter: take".as_bytes(),
-                );
+                send(res, StatusCode::BadRequest, b"bad parameter: take");
                 return;
             }
         },

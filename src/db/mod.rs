@@ -79,10 +79,10 @@ impl DbStored for StatusAction {
                 .unwrap();
                 self.action.id = Some(action_id);
                 match mqtt {
-                    &Some(ref m) => {
+                    Some(ref m) => {
                         m.send(TypedAction::Status(self.clone())).unwrap();
                     }
-                    &None => {}
+                    None => {}
                 }
                 Some(action_id)
             }
@@ -107,9 +107,9 @@ impl FromSql for Status {
 impl ToSql for Status {
     fn to_sql(&self) -> Result<ToSqlOutput, Error> {
         let i = match self {
-            &Status::Public => 2,
-            &Status::Private => 1,
-            &Status::Closed => 0,
+            Status::Public => 2,
+            Status::Private => 1,
+            Status::Closed => 0,
         };
         Ok(ToSqlOutput::Owned(Value::Integer(i)))
     }
@@ -200,7 +200,7 @@ impl DbStored for AnnouncementAction {
                             .unwrap();
                             self.action.id = Some(action_id);
                             self.aid = Some(action_id);
-                            if let &Some(ref m) = mqtt {
+                            if let Some(ref m) = mqtt {
                                 m.send(TypedAction::Announcement(self.clone())).unwrap();
                             }
                             Some(action_id)
@@ -224,7 +224,7 @@ impl DbStored for AnnouncementAction {
                                     &[&(action_id as i64), &1, &(aid as i64),
                                       &self.user, &self.from, &self.to, &(self.public as i64)]).unwrap();
                             self.action.id = Some(action_id);
-                            if let &Some(ref m) = mqtt {
+                            if let Some(ref m) = mqtt {
                                 m.send(TypedAction::Announcement(self.clone())).unwrap();
                             }
                             Some(action_id)
@@ -251,7 +251,7 @@ impl DbStored for AnnouncementAction {
                                     &[&(action_id as i64), &2, &(aid as i64),
                                       &self.user, &self.from, &self.to, &(self.public as i64)]).unwrap();
                             self.action.id = Some(action_id);
-                            if let &Some(ref m) = mqtt {
+                            if let Some(m) = mqtt {
                                 m.send(TypedAction::Announcement(self.clone())).unwrap();
                             }
                             Some(action_id)
@@ -280,9 +280,9 @@ impl FromSql for AnnouncementMethod {
 impl ToSql for AnnouncementMethod {
     fn to_sql(&self) -> Result<ToSqlOutput, Error> {
         let i = match self {
-            &AnnouncementMethod::New => 0,
-            &AnnouncementMethod::Mod => 1,
-            &AnnouncementMethod::Del => 2,
+            AnnouncementMethod::New => 0,
+            AnnouncementMethod::Mod => 1,
+            AnnouncementMethod::Del => 2,
         };
         Ok(ToSqlOutput::Owned(Value::Integer(i)))
     }
@@ -402,10 +402,10 @@ impl DbStored for PresenceAction {
                 }
                 self.action.id = Some(action_id);
                 match mqtt {
-                    &Some(ref m) => {
+                    Some(ref m) => {
                         m.send(TypedAction::Presence(self.clone())).unwrap();
                     }
-                    &None => {}
+                    None => {}
                 }
                 Some(action_id)
             }
@@ -446,10 +446,7 @@ pub mod presence {
             .unwrap();
         let mut users: Vec<PresentUser> = users_iter.map(|user| user.unwrap()).collect();
         users.sort_by_key(|u| u.name.clone());
-        Ok(PresenceAction {
-            action: action,
-            users: users,
-        })
+        Ok(PresenceAction { action, users })
     }
 
     pub fn get_by_id(id: u64, con: &DbCon) -> Result<PresenceAction, Error> {
