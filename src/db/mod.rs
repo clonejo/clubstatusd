@@ -593,7 +593,7 @@ pub fn query(
     count: u64,
     take: Take,
     con: &mut DbCon,
-) -> Result<Vec<Box<Action>>, Error> {
+) -> Result<Vec<Box<dyn Action>>, Error> {
     let mut query_str = String::from("SELECT id, type FROM action WHERE");
 
     // for livetime reasons we need to define these variables before params:
@@ -604,7 +604,7 @@ pub fn query(
     let count = count as i64;
     let type_int;
 
-    let mut params = Vec::<&ToSql>::new();
+    let mut params = Vec::<&dyn ToSql>::new();
 
     match id {
         RangeExpr::Single(IdExpr::Int(i)) => {
@@ -667,19 +667,19 @@ pub fn query(
 
     let mut stmt = con.prepare(&query_str[..]).unwrap();
     let actions_iter = stmt
-        .query_map(&*params, |row| -> Box<Action> {
+        .query_map(&*params, |row| -> Box<dyn Action> {
             match row.get(1) {
                 0 => Box::new(status::get_by_id(row.get::<_, i64>(0) as u64, &con).unwrap())
-                    as Box<Action>,
+                    as Box<dyn Action>,
                 1 => Box::new(announcements::get_by_id(row.get::<_, i64>(0) as u64, &con).unwrap())
-                    as Box<Action>,
+                    as Box<dyn Action>,
                 2 => Box::new(presence::get_by_id(row.get::<_, i64>(0) as u64, &con).unwrap())
-                    as Box<Action>,
+                    as Box<dyn Action>,
                 id => panic!("unknown action type in db: {}", id),
             }
         })
         .unwrap();
-    let mut actions: Vec<Box<Action>> = actions_iter.map(|res| res.unwrap()).collect();
+    let mut actions: Vec<Box<dyn Action>> = actions_iter.map(|res| res.unwrap()).collect();
     if take == Take::Last {
         actions.reverse();
     }

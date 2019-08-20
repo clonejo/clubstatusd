@@ -97,7 +97,7 @@ pub fn run(
         None => None,
     };
 
-    let mut router: Router<(Method, Box<Handler>)> = Router::new();
+    let mut router: Router<(Method, Box<dyn Handler>)> = Router::new();
     router.add("/api/versions", (Method::Get, Box::new(api_versions)));
     router.add("/api/v0", (Method::Put, Box::new(create_action)));
     router.add("/api/v0/:type", (Method::Get, Box::new(query)));
@@ -143,7 +143,7 @@ pub fn run(
                     handler: tup,
                     params,
                 }) => {
-                    let &(ref method, ref handler): &(Method, Box<Handler>) = tup;
+                    let &(ref method, ref handler): &(Method, Box<dyn Handler>) = tup;
                     let authenticated = match pass_cookie {
                         None => true,
                         Some((ref pass_str, ref cookie)) => {

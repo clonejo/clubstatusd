@@ -230,7 +230,7 @@ pub enum TypedAction {
     Presence(PresenceAction),
 }
 
-impl ToJson for Box<Action> {
+impl ToJson for Box<dyn Action> {
     fn to_json(&self) -> Json {
         (**self).to_json()
     }
@@ -314,7 +314,7 @@ fn get_public(obj: &Object) -> Result<bool, String> {
 }
 
 pub enum RequestObject {
-    Action(Box<Action>),
+    Action(Box<dyn Action>),
     PresenceRequest(String),
 }
 
