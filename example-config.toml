@@ -20,8 +20,13 @@ database_path = "./db.sqlite"
 #cookie_salt = "00112233445566778899aabbccddeeff00112233445566778899aabbccddeeff"
 
 # If given, provide a spaceapi compatible output at /spaceapi
+# SpaceAPI spec: https://spaceapi.io/docs/
+#
 # You can set any constant parts within the string.
-# Do not add the 'state' element to the root, clubstatusd does this for you.
+# Please add an empty 'state' object to the root, clubstatusd will fill in
+# 'open' and 'lastchanged'.
+# clubstatusd will not validate the 'api' version field, so please update it
+# yourself.
 spaceapi = """
 {
     "api": "0.13",
@@ -38,7 +43,8 @@ spaceapi = """
     },
     "issue_report_channels": [
         "twitter"
-    ]
+    ],
+    "state": {}
 }
 """
 

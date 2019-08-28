@@ -1,6 +1,7 @@
 use std::any::Any;
 use std::cmp::{min, Ordering};
 use std::collections::HashMap;
+use std::convert::TryInto;
 use std::io::Read;
 use std::num::ParseIntError;
 use std::str;
@@ -19,6 +20,7 @@ use rustc_serialize::hex::ToHex;
 use rustc_serialize::json::{Json, Object, ToJson};
 use sodiumoxide::crypto::pwhash;
 use sodiumoxide::crypto::pwhash::Salt;
+use spaceapi::Status as SpaceapiStatus;
 use urlparse;
 
 use crate::db;
@@ -81,7 +83,7 @@ pub fn run(
     password: Option<String>,
     cookie_salt: Salt,
     mqtt: Option<Sender<TypedAction>>,
-    spaceapi_static: Option<Object>,
+    spaceapi_static: Option<SpaceapiStatus>,
 ) {
     let mqtt_arc = Arc::new(Mutex::new(mqtt.clone()));
     let presence_tracker = Arc::new(Mutex::new(db::presence::start_tracker(
@@ -618,27 +620,22 @@ fn query(
     res.send(resp_str.as_bytes()).unwrap();
 }
 
-fn spaceapi(mut res: Response, shared_con: Arc<Mutex<DbCon>>, spaceapi_static: Object) {
+fn spaceapi(mut res: Response, shared_con: Arc<Mutex<DbCon>>, spaceapi_static: SpaceapiStatus) {
     let changed_action = {
         let con = shared_con.lock().unwrap();
         db::status::get_last_changed_public(&*con).unwrap()
     };
 
-    let mut root = spaceapi_static;
-    let mut state = Object::new();
-    state.insert(
-        "open".into(),
-        Json::Boolean(changed_action.status == Status::Public),
-    );
-    state.insert("lastchange".into(), Json::I64(changed_action.action.time));
-    root.insert("state".into(), state.to_json());
+    let mut status = spaceapi_static.clone();
+    status.state.open = Some(changed_action.status == Status::Public);
+    status.state.lastchange = Some(changed_action.action.time.try_into().unwrap());
 
     {
         let headers = res.headers_mut();
         headers.set(header::ContentType::json());
         headers.set(header::AccessControlAllowOrigin::Any);
     }
-    let mut resp_str = root.to_json().to_string();
+    let mut resp_str = serde_json::to_string(&status).unwrap();
     resp_str.push('\n');
     res.send(resp_str.as_bytes()).unwrap();
 }

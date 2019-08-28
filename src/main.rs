@@ -10,7 +10,6 @@ use std::sync::{Arc, Mutex};
 
 use clap::{App, Arg};
 use config::{Config, ConfigError};
-use rustc_serialize::json::Json;
 use sodiumoxide::crypto::pwhash;
 use sodiumoxide::crypto::pwhash::Salt;
 
@@ -79,12 +78,10 @@ fn main() {
             let mqtt_handler =
                 api::mqtt::start_handler(mqtt_server, port, mqtt_topic_prefix, shared_con.clone());
 
-            let spaceapi_static = conf.get_str("spaceapi").ok().map(|s| {
-                Json::from_str(s.as_str())
-                    .expect("Cannot parse spaceapi json.")
-                    .into_object()
-                    .unwrap()
-            });
+            let spaceapi_static = conf
+                .get_str("spaceapi")
+                .ok()
+                .map(|s| serde_json::from_str(s.as_str()).expect("Cannot parse spaceapi json."));
 
             let listen_addr = conf
                 .get_str("listen")

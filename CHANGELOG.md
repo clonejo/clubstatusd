@@ -5,6 +5,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+### Changed
+- Now using [spaceapi-rs](https://github.com/spaceapi-community/spaceapi-rs)
+  for generating [SpaceAPI](https://spaceapi.io/) output. Because of that, the
+  `state` field must now be added to the `spaceapi` config field (set it to an
+  empty object `{}`).
 
 ## v0.3.2 - 2019-07-15
 ### Changed
@@ -38,7 +43,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   compile on Debian Stretch.
 
 ## v0.2.4 - 2017-05-06
-- update rusqlite to 0.11.0 to fix pkg_build problem
+- update rusqlite to 0.11.0 to fix `pkg_build` problem
 
 ## v0.2.3 - 2017-02-25
 ### Security
