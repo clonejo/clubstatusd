@@ -51,11 +51,9 @@ spaceapi = """
 [mqtt]
 # MQTT Server to send changes to
 # MQTT is enabled when uncommented
-#server = "mqtt.example.org:1883";
+#server = "mqtt.example.org";
 #port = 1883
-server = "mqtt.tihange.aachen.ccc.de"
 
 # don't forget trailing slash
 # default: no prefix
 #topic_prefix = "status/"
-topic_prefix = "test-status/"
