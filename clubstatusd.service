@@ -2,7 +2,12 @@
 [Unit]
 Description=HTTP API for managing your hackerspace's status
 
+# Only required for connecting to an external MQTT server:
+Wants=network-online.target
+After=network-online.target
+
 [Service]
+Type=exec
 ExecStart=/usr/local/bin/clubstatusd
 Restart=on-failure
 
