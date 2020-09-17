@@ -27,3 +27,10 @@ To build, run `cargo build --release`
 
 # Dependency Graph
 ![DAG of dependency crates created using cargo-deps](dependencies.png)
+
+# API examples
+## Create announcement
+```sh
+jq --null-input '{type: "announcement", method: "new", from: 1610612736, to: 1610612737, note: "2^29 * 3", user: "Hans", public: false}' \
+  | curl http://localhost:8000/api/v0 -X PUT --data @- -v
+```
