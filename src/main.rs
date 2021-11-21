@@ -42,59 +42,8 @@ fn main() {
     let db_path_str = conf
         .get_str("database_path")
         .unwrap_or_else(|_| String::from("/var/local/clubstatusd/db.sqlite"));
-    match db::connect(db_path_str.as_str()) {
-        Ok(con) => {
-            let password = match conf.get_str("password") {
-                Ok(s) => Some(s),
-                Err(ConfigError::NotFound(_)) => {
-                    writeln!(
-                        &mut stderr(),
-                        "No password set, the whole API will be available unauthenticated."
-                    )
-                    .unwrap();
-                    None
-                }
-                Err(e) => {
-                    dbg!(e);
-                    panic!();
-                }
-            };
-            let cookie_salt: Salt = match conf.get_str("cookie_salt") {
-                Ok(s) => hex_str_to_salt(s.as_str()),
-                Err(ConfigError::NotFound(_)) => pwhash::gen_salt(),
-                Err(e) => {
-                    dbg!(e);
-                    panic!();
-                }
-            };
-
-            let shared_con = Arc::new(Mutex::new(con));
-
-            let mqtt_server = conf.get_str("mqtt.server").ok();
-            let port = conf.get_int("mqtt.port").unwrap_or(1883) as u16;
-            let mqtt_topic_prefix = conf
-                .get_str("mqtt.topic_prefix")
-                .unwrap_or_else(|_| String::from(""));
-            let mqtt_handler =
-                api::mqtt::start_handler(mqtt_server, port, mqtt_topic_prefix, shared_con.clone());
-
-            let spaceapi_static = conf
-                .get_str("spaceapi")
-                .ok()
-                .map(|s| serde_json::from_str(s.as_str()).expect("Cannot parse spaceapi json."));
-
-            let listen_addr = conf
-                .get_str("listen")
-                .unwrap_or_else(|_| String::from("localhost:8000"));
-            api::run(
-                shared_con,
-                listen_addr.as_str(),
-                password,
-                cookie_salt,
-                mqtt_handler,
-                spaceapi_static,
-            );
-        }
+    let con = match db::connect(db_path_str.as_str()) {
+        Ok(con) => con,
         Err(err) => {
             writeln!(
                 &mut stderr(),
@@ -105,7 +54,57 @@ fn main() {
             .unwrap();
             std::process::exit(1);
         }
-    }
+    };
+    let password = match conf.get_str("password") {
+        Ok(s) => Some(s),
+        Err(ConfigError::NotFound(_)) => {
+            writeln!(
+                &mut stderr(),
+                "No password set, the whole API will be available unauthenticated."
+            )
+            .unwrap();
+            None
+        }
+        Err(e) => {
+            dbg!(e);
+            panic!();
+        }
+    };
+    let cookie_salt: Salt = match conf.get_str("cookie_salt") {
+        Ok(s) => hex_str_to_salt(s.as_str()),
+        Err(ConfigError::NotFound(_)) => pwhash::gen_salt(),
+        Err(e) => {
+            dbg!(e);
+            panic!();
+        }
+    };
+
+    let shared_con = Arc::new(Mutex::new(con));
+
+    let mqtt_server = conf.get_str("mqtt.server").ok();
+    let port = conf.get_int("mqtt.port").unwrap_or(1883) as u16;
+    let mqtt_topic_prefix = conf
+        .get_str("mqtt.topic_prefix")
+        .unwrap_or_else(|_| String::from(""));
+    let mqtt_handler =
+        api::mqtt::start_handler(mqtt_server, port, mqtt_topic_prefix, shared_con.clone());
+
+    let spaceapi_static = conf
+        .get_str("spaceapi")
+        .ok()
+        .map(|s| serde_json::from_str(s.as_str()).expect("Cannot parse spaceapi json."));
+
+    let listen_addr = conf
+        .get_str("listen")
+        .unwrap_or_else(|_| String::from("localhost:8000"));
+    api::run(
+        shared_con,
+        listen_addr.as_str(),
+        password,
+        cookie_salt,
+        mqtt_handler,
+        spaceapi_static,
+    );
 }
 
 fn hex_str_to_salt(s: &str) -> Salt {
