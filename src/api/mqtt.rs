@@ -59,7 +59,7 @@ fn publish_presence<'a>(action: &'a PresenceAction, client: &mut MqttClient, top
         .filter(|u: &&PresentUser| -> bool { u.status != PresentUserStatus::Left })
         .map(|u: &'a PresentUser| -> &'a str { &*u.name })
         .collect();
-    users.sort();
+    users.sort_unstable();
     let users_string: String = users.join(",");
     client
         .publish(

@@ -518,7 +518,7 @@ pub mod presence {
 
                     // presence requests time out after 15min + time slept
                     // set these users' status to left
-                    for (ref _user, ref mut presence) in users.iter_mut() {
+                    for (_user, mut presence) in users.iter_mut() {
                         // use values_mut() when stable
                         if presence.last_seen + 15 * 60 <= now {
                             presence.status = PresentUserStatus::Left;
@@ -546,7 +546,7 @@ pub mod presence {
                     }
 
                     // switch users with status=joined to present
-                    for (ref _user, ref mut presence) in users.iter_mut() {
+                    for (_user, mut presence) in users.iter_mut() {
                         // use values_mut() when stable
                         if presence.status == PresentUserStatus::Joined {
                             presence.status = PresentUserStatus::Present;
@@ -669,11 +669,11 @@ pub fn query(
     let actions_iter = stmt
         .query_map(&*params, |row| -> Box<dyn Action> {
             match row.get(1) {
-                0 => Box::new(status::get_by_id(row.get::<_, i64>(0) as u64, &con).unwrap())
+                0 => Box::new(status::get_by_id(row.get::<_, i64>(0) as u64, con).unwrap())
                     as Box<dyn Action>,
-                1 => Box::new(announcements::get_by_id(row.get::<_, i64>(0) as u64, &con).unwrap())
+                1 => Box::new(announcements::get_by_id(row.get::<_, i64>(0) as u64, con).unwrap())
                     as Box<dyn Action>,
-                2 => Box::new(presence::get_by_id(row.get::<_, i64>(0) as u64, &con).unwrap())
+                2 => Box::new(presence::get_by_id(row.get::<_, i64>(0) as u64, con).unwrap())
                     as Box<dyn Action>,
                 id => panic!("unknown action type in db: {}", id),
             }

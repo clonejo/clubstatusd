@@ -192,7 +192,7 @@ impl ToJson for PresenceAction {
         let json_users: Vec<Json> = self
             .users
             .iter()
-            .filter_map(|ref user| {
+            .filter_map(|user| {
                 if user.status == PresentUserStatus::Left {
                     None
                 } else {

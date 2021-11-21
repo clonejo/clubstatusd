@@ -21,7 +21,6 @@ use rustc_serialize::json::{Json, Object, ToJson};
 use sodiumoxide::crypto::pwhash;
 use sodiumoxide::crypto::pwhash::Salt;
 use spaceapi::Status as SpaceapiStatus;
-use urlparse;
 
 use crate::db;
 use crate::db::DbCon;
@@ -88,7 +87,7 @@ pub fn run(
     let mqtt_arc = Arc::new(Mutex::new(mqtt.clone()));
     let presence_tracker = Arc::new(Mutex::new(db::presence::start_tracker(
         shared_con.clone(),
-        mqtt.clone(),
+        mqtt,
     )));
 
     let pass_cookie = match password {
@@ -626,7 +625,7 @@ fn spaceapi(mut res: Response, shared_con: Arc<Mutex<DbCon>>, spaceapi_static: S
         db::status::get_last_changed_public(&*con).unwrap()
     };
 
-    let mut status = spaceapi_static.clone();
+    let mut status = spaceapi_static;
     status.state.open = Some(changed_action.status == Status::Public);
     status.state.lastchange = Some(changed_action.action.time.try_into().unwrap());
 
