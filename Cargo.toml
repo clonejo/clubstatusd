@@ -6,7 +6,7 @@ An HTTP API which allows the folks in your hackerspace to track it's status, wit
 version = "0.4.0"
 authors = ["clonejo <clonejo@shakik.de>"]
 license = "Apache-2.0"
-edition = "2018"
+edition = "2021"
 repository = "https://gitlab.aachen.ccc.de/clubstatus/clubstatusd"
 keywords = ["spaceapi"]
 
