@@ -1,3 +1,6 @@
+#[macro_use]
+extern crate rocket;
+
 mod api;
 mod db;
 mod model;
@@ -13,7 +16,8 @@ use config::{Config, ConfigError};
 use sodiumoxide::crypto::pwhash;
 use sodiumoxide::crypto::pwhash::Salt;
 
-fn main() {
+#[launch]
+async fn rocket() -> _ {
     let arg_matches = App::new("clubstatusd")
         .author("clonejo <clonejo@shakik.de>")
         .about(
@@ -104,7 +108,7 @@ fn main() {
         cookie_salt,
         mqtt_handler,
         spaceapi_static,
-    );
+    )
 }
 
 fn hex_str_to_salt(s: &str) -> Salt {
