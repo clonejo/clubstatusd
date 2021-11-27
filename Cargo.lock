@@ -149,6 +149,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "base64"
+version = "0.13.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "904dfeac50f3cdaba28fc6f57fdcddb75f49ed61346676a78c4ffe55877802fd"
+
+[[package]]
 name = "binascii"
 version = "0.1.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -250,9 +256,11 @@ dependencies = [
  "chrono",
  "clap",
  "config",
+ "cookie",
  "libc",
  "regex",
  "rocket",
+ "rocket-basicauth",
  "route-recognizer",
  "rumqtt",
  "rusqlite",
@@ -1607,6 +1615,17 @@ dependencies = [
  "ubyte",
  "version_check 0.9.3",
  "yansi",
+]
+
+[[package]]
+name = "rocket-basicauth"
+version = "2.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "79128c0f55b7bc6785c13816d71af4baee156bd615b09468800edaaa7da56a08"
+dependencies = [
+ "base64 0.13.0",
+ "log",
+ "rocket",
 ]
 
 [[package]]

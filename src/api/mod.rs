@@ -2,9 +2,9 @@ use std::any::Any;
 use std::cmp::{min, Ordering};
 use std::collections::HashMap;
 use std::convert::TryInto;
+use std::error::Error;
 use std::io::Cursor;
 use std::io::Read;
-use std::net::IpAddr;
 use std::net::ToSocketAddrs;
 use std::num::ParseIntError;
 use std::str;
@@ -13,12 +13,15 @@ use std::sync::mpsc::Sender;
 use std::sync::{Arc, Mutex};
 
 use chrono::{Datelike, TimeZone, Utc};
+use cookie::Expiration;
 use rocket::config::Config;
 use rocket::http::{self, Header};
-use rocket::request::Request;
+use rocket::http::{Cookie, CookieJar, SameSite};
+use rocket::request::{self, FromRequest, Request};
 use rocket::response::{self, content, Responder, Response};
 use rocket::serde::Serialize;
 use rocket::{Build, Rocket, State};
+use rocket_basicauth::BasicAuth;
 //use hyper::header;
 //use hyper::method::Method;
 //use hyper::server::{Request, Response, Server};
@@ -35,7 +38,8 @@ use crate::db;
 use crate::db::DbCon;
 use crate::model::Status;
 use crate::model::{
-    json_to_object, parse_time_string, QueryActionType, RequestObject, TypedAction,
+    json_to_object, parse_time_string, AnnouncementAction, AnnouncementMethod, BaseAction,
+    QueryActionType, RequestObject, StatusAction, TypedAction,
 };
 
 pub mod mqtt;
@@ -99,29 +103,30 @@ pub fn run(
         mqtt,
     )));
 
-    let pass_cookie = match password {
-        Some(pw) => {
-            let cookie = generate_cookie(&cookie_salt, pw.as_str());
-            Some((pw, cookie))
-        }
-        None => None,
-    };
+    let auth_secrets = password.map(|p| AuthSecrets {
+        cookie: generate_cookie(&cookie_salt, p.as_str()),
+        password: p,
+    });
 
     let mut config = Config::default();
     let socket_addr = listen.to_socket_addrs().unwrap().next().unwrap();
     config.address = socket_addr.ip();
     config.port = socket_addr.port();
 
-    let mut rocket = rocket::custom(config).manage(shared_con).mount(
-        "/",
-        routes![
-            api_versions,
-            //create_action,
-            //query,
-            //status_current,
-            //announcement_current
-        ],
-    );
+    let mut rocket = rocket::custom(config)
+        .manage(shared_con)
+        .manage(dbg!(auth_secrets))
+        .mount(
+            "/",
+            routes![
+                api_versions,
+                //create_action,
+                //query,
+                status_current,
+                status_current_public,
+                //announcement_current
+            ],
+        );
 
     //let mut router: Router<(Method, Box<dyn Handler>)> = Router::new();
     //router.add("/api/versions", (Method::Get, Box::new(api_versions)));
@@ -195,22 +200,54 @@ pub fn run(
     rocket
 }
 
-/*
- * split uri into path and parameters
- */
-fn split_uri(uri_str: &str) -> (&str, Option<&str>) {
-    let mut split = uri_str.splitn(2, '?');
-    (split.next().unwrap(), split.next())
+#[derive(Debug)]
+struct AuthSecrets {
+    password: String,
+    cookie: String,
 }
-
-fn public_api_strip(json: &mut Json) {
-    let obj = json.as_object_mut().unwrap();
-    obj.remove("id");
-    obj.remove("note");
-    obj.remove("user");
-    let status = obj.get_mut("status").unwrap();
-    if status.as_string().unwrap() == "private" {
-        *status = Json::String(String::from("closed"));
+/**
+ * Request guard, that checks if a user has provided the correct auth cookie, or has provided the
+ * correct Basic Auth password, after which the cookie is set.
+ *
+ * If no password is configured in config, this does guard does nothing.
+ */
+struct Authenticated {
+    // idea: add reference to request, so guard cannot be used without request
+}
+#[rocket::async_trait]
+impl<'r> FromRequest<'r> for Authenticated {
+    type Error = &'static str;
+    async fn from_request(req: &'r Request<'_>) -> request::Outcome<Self, Self::Error> {
+        let cookie_jar = req.guard::<&CookieJar>().await.unwrap(); // CookieJar has Error=Infallible
+        let auth_secrets = match &**req.guard::<&State<Option<AuthSecrets>>>().await.unwrap() {
+            None => {
+                // authentication is disabled
+                return request::Outcome::Success(Authenticated {});
+            }
+            Some(s) => s,
+        };
+        if let Some(cookie) = cookie_jar.get("clubstatusd-password") {
+            if cookie.value() == auth_secrets.cookie {
+                // set cookie again to extend lifetime
+                set_auth_cookie(&cookie_jar, auth_secrets.cookie.as_str());
+                return request::Outcome::Success(Authenticated {});
+            }
+        }
+        let auth = req.guard::<BasicAuth>().await;
+        let basic_auth_password = match auth {
+            request::Outcome::Success(ref a) => a.password.as_str(),
+            _ => "",
+        };
+        if basic_auth_password == auth_secrets.password {
+            set_auth_cookie(&cookie_jar, auth_secrets.cookie.as_str());
+            return request::Outcome::Success(Authenticated {});
+        } else {
+            clear_auth_cookie(&cookie_jar);
+            return request::Outcome::Failure((
+                http::Status::Unauthorized,
+                "Auth check failed. Please perform HTTP basic auth with the correct password.",
+            ));
+        }
     }
 }
 
@@ -227,39 +264,21 @@ fn generate_cookie(cookie_salt: &Salt, password: &str) -> String {
     (&key[..]).to_hex()
 }
 
-//#[allow(clippy::unneeded_field_pattern)]
-//fn check_authentication(req: &Request, password: &str, cookie_value: &str) -> bool {
-//    if let Some(cookies) = req.headers.get::<header::Cookie>() {
-//        let correct_cookie = format!("clubstatusd-password={}", cookie_value);
-//        if cookies.iter().any(|c| c == correct_cookie.as_str()) {
-//            return true;
-//        }
-//    }
-//    match req.headers.get::<header::Authorization<header::Basic>>() {
-//        Some(&header::Authorization(header::Basic {
-//            username: _,
-//            password: Some(ref tried_password),
-//        })) => tried_password == password,
-//        _ => false,
-//    }
-//}
+fn set_auth_cookie(cookie_jar: &CookieJar, cookie: &str) {
+    // cookie expires in 1 to 2 years
+    let expiration_year = Utc::today().year() + 2;
+    let expire_time = Utc.ymd(expiration_year, 1, 1).and_hms(0, 0, 0);
+    let cookie = Cookie::parse(format!(
+        "clubstatusd-password={}; Path=/; Expires={}",
+        cookie, expire_time
+    ))
+    .unwrap();
+    cookie_jar.add(cookie);
+}
 
-//fn set_auth_cookie(res: &mut Response, cookie: &str) {
-//    // cookie expires in 1 to 2 years
-//    let expiration_year = Utc::today().year() + 2;
-//    let expire_time = Utc
-//        .ymd(expiration_year, 1, 1)
-//        .and_hms(0, 0, 0)
-//        .format("%a, %m %b %Y %H:%M:%S GMT");
-//    res.headers_mut().set(header::SetCookie(vec![format!(
-//        "clubstatusd-password={}; Path=/; Expires={}",
-//        cookie, expire_time
-//    )]));
-//}
-
-//fn clear_auth_cookie(res: &mut Response) {
-//    set_auth_cookie(res, "");
-//}
+fn clear_auth_cookie(cookie_jar: &CookieJar) {
+    set_auth_cookie(cookie_jar, "");
+}
 
 fn parse_get_params<'a>(get_params_str: Option<String>) -> GetParams<'a> {
     let mut params = HashMap::new();
@@ -357,54 +376,39 @@ fn api_versions<'a>() -> RestResponder<ApiVersions> {
 //    }
 //}
 
-/* *
- * GET
- */
-//fn status_current(
-//    pr: ParsedRequest,
-//    mut res: Response,
-//    shared_con: Arc<Mutex<DbCon>>,
-//    _: Arc<Mutex<Sender<String>>>,
-//    _: Arc<Mutex<Option<Sender<TypedAction>>>>,
-//) {
-//    let get_params = parse_get_params(pr.get_params_str);
-//    let public_api = get_params.contains_key("public");
-//    if !public_api && !pr.authenticated {
-//        send_unauthorized(res);
-//        return;
-//    }
-//    let mut obj = Object::new();
-//    let con = shared_con.lock().unwrap();
-//    if !public_api {
-//        obj.insert(
-//            "last".into(),
-//            db::status::get_last(&*con).unwrap().to_json(),
-//        );
-//    }
-//
-//    let mut changed_action = if public_api {
-//        db::status::get_last_changed_public(&*con)
-//            .unwrap()
-//            .to_json()
-//    } else {
-//        db::status::get_last_changed(&*con).unwrap().to_json()
-//    };
-//    if public_api {
-//        public_api_strip(&mut changed_action);
-//    }
-//    obj.insert("changed".into(), changed_action);
-//
-//    {
-//        let headers = res.headers_mut();
-//        headers.set(header::ContentType::json());
-//        if public_api {
-//            headers.set(header::AccessControlAllowOrigin::Any);
-//        }
-//    }
-//    let mut resp_str = obj.to_json().to_string();
-//    resp_str.push('\n');
-//    res.send(resp_str.as_bytes()).unwrap();
-//}
+#[get("/api/v0/status/current")]
+fn status_current(
+    _authenticated: Authenticated,
+    shared_con: &State<Arc<Mutex<DbCon>>>,
+) -> RestResponder<StatusCurrent> {
+    let con = shared_con.lock().unwrap();
+    let last = db::status::get_last(&*con).unwrap();
+    let changed = db::status::get_last_changed(&*con).unwrap();
+    let status_current = StatusCurrent { last, changed };
+    RestResponder::new(AuthRequired::Required, status_current)
+}
+#[get("/api/v0/status/current?public")]
+fn status_current_public(
+    shared_con: &State<Arc<Mutex<DbCon>>>,
+) -> RestResponder<StatusCurrentPublic> {
+    let con = shared_con.lock().unwrap();
+
+    let changed = db::status::get_last_changed_public(&*con)
+        .unwrap()
+        .to_public();
+    let status_current = StatusCurrentPublic { changed };
+    RestResponder::new(AuthRequired::Public, status_current)
+}
+#[derive(Serialize)]
+struct StatusCurrent {
+    last: StatusAction,
+    changed: StatusAction,
+}
+#[derive(Serialize)]
+struct StatusCurrentPublic {
+    changed: PublicStatusAction,
+}
+
 #[derive(PartialEq)]
 enum AuthRequired {
     Required,
@@ -686,4 +690,82 @@ fn spaceapi_(
     status.state.lastchange = Some(changed_action.action.time.try_into().unwrap());
 
     RestResponder::new(AuthRequired::Public, status)
+}
+
+#[derive(Debug, Serialize)]
+struct PublicBaseAction {
+    pub id: u64,
+    pub time: i64,
+    // no user
+    // no note (PublicAnnouncementAction has a note field instead)
+}
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "lowercase")]
+enum PublicStatus {
+    Public,
+    Closed,
+}
+#[derive(Debug, Serialize)]
+struct PublicStatusAction {
+    #[serde(flatten)]
+    pub action: PublicBaseAction,
+    pub status: PublicStatus,
+}
+#[derive(Debug, Serialize)]
+struct PublicAnnouncementAction {
+    #[serde(flatten)]
+    pub action: PublicBaseAction,
+    pub method: AnnouncementMethod,
+    pub aid: u64, // announcement id
+    pub from: i64,
+    pub to: i64,
+
+    pub note: String,
+}
+
+trait ToPublic {
+    type Public;
+    fn to_public(&self) -> Self::Public;
+}
+impl ToPublic for Status {
+    type Public = PublicStatus;
+    fn to_public(&self) -> PublicStatus {
+        match self {
+            Status::Public => PublicStatus::Public,
+            Status::Private => PublicStatus::Closed,
+            Status::Closed => PublicStatus::Closed,
+        }
+    }
+}
+impl ToPublic for BaseAction {
+    type Public = PublicBaseAction;
+    fn to_public(&self) -> PublicBaseAction {
+        PublicBaseAction {
+            id: self.id.unwrap(),
+            time: self.time,
+        }
+    }
+}
+impl ToPublic for StatusAction {
+    type Public = PublicStatusAction;
+    fn to_public(&self) -> PublicStatusAction {
+        PublicStatusAction {
+            action: self.action.to_public(),
+            status: self.status.to_public(),
+        }
+    }
+}
+impl ToPublic for AnnouncementAction {
+    type Public = PublicAnnouncementAction;
+    fn to_public(&self) -> PublicAnnouncementAction {
+        assert!(self.public);
+        PublicAnnouncementAction {
+            action: self.action.to_public(),
+            method: self.method,
+            aid: self.aid.unwrap(),
+            from: self.from,
+            to: self.to,
+            note: self.action.note.clone(),
+        }
+    }
 }

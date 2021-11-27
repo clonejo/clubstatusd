@@ -1,10 +1,11 @@
 use chrono::Utc;
 use regex::Regex;
+use rocket::serde::Serialize;
 use rustc_serialize::json::{Json, Object, ToJson};
 
 use crate::db::DbStored;
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize)]
 pub struct BaseAction {
     pub id: Option<u64>,
     pub time: i64,
@@ -41,14 +42,16 @@ pub enum QueryActionType {
     All,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize)]
 pub struct StatusAction {
+    #[serde(flatten)]
     pub action: BaseAction,
     pub user: String,
     pub status: Status,
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Serialize)]
+#[serde(rename_all = "lowercase")]
 pub enum Status {
     Public,
     Private,
@@ -99,8 +102,9 @@ impl ToJson for StatusAction {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize)]
 pub struct AnnouncementAction {
+    #[serde(flatten)]
     pub action: BaseAction,
     pub method: AnnouncementMethod,
     pub aid: Option<u64>, // announcement id
@@ -110,7 +114,8 @@ pub struct AnnouncementAction {
     pub public: bool,
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq, Serialize)]
+#[serde(rename_all = "lowercase")]
 pub enum AnnouncementMethod {
     New,
     Mod,
@@ -144,8 +149,9 @@ impl ToJson for AnnouncementAction {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize)]
 pub struct PresenceAction {
+    #[serde(flatten)]
     pub action: BaseAction,
     pub users: Vec<PresentUser>,
 }
@@ -163,14 +169,15 @@ impl PresenceAction {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize)]
 pub struct PresentUser {
     pub name: String,
     pub since: i64,
     pub status: PresentUserStatus,
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Serialize)]
+#[serde(rename_all = "lowercase")]
 pub enum PresentUserStatus {
     Joined,
     Present,
