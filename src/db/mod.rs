@@ -1,5 +1,5 @@
 use std::path::Path;
-use std::sync::mpsc::Sender;
+use std::sync::mpsc::SyncSender;
 
 use rusqlite::types::{FromSql, FromSqlError, FromSqlResult, ToSql, ToSqlOutput, Value, ValueRef};
 use rusqlite::{Connection, Error, Transaction};
@@ -20,7 +20,7 @@ pub fn connect(path_str: &str) -> Result<DbCon, Error> {
 }
 
 pub trait DbStored {
-    fn store(&mut self, con: &Transaction, mqtt: &Option<Sender<TypedAction>>) -> Option<u64>;
+    fn store(&mut self, con: &Transaction, mqtt: Option<&SyncSender<TypedAction>>) -> Option<u64>;
 }
 
 pub trait DbStoredTyped {
@@ -44,7 +44,7 @@ impl DbStoredTyped for BaseAction {
  */
 
 impl DbStored for StatusAction {
-    fn store(&mut self, tx: &Transaction, mqtt: &Option<Sender<TypedAction>>) -> Option<u64> {
+    fn store(&mut self, tx: &Transaction, mqtt: Option<&SyncSender<TypedAction>>) -> Option<u64> {
         match self.action.id {
             None => {
                 let (changed, public_changed) = match status::get_last(tx) {
@@ -174,7 +174,7 @@ pub mod status {
  */
 
 impl DbStored for AnnouncementAction {
-    fn store(&mut self, tx: &Transaction, mqtt: &Option<Sender<TypedAction>>) -> Option<u64> {
+    fn store(&mut self, tx: &Transaction, mqtt: Option<&SyncSender<TypedAction>>) -> Option<u64> {
         match self.action.id {
             None => {
                 match self.method {
@@ -383,7 +383,7 @@ pub mod announcements {
  */
 
 impl DbStored for PresenceAction {
-    fn store(&mut self, tx: &Transaction, mqtt: &Option<Sender<TypedAction>>) -> Option<u64> {
+    fn store(&mut self, tx: &Transaction, mqtt: Option<&SyncSender<TypedAction>>) -> Option<u64> {
         match self.action.id {
             None => {
                 tx.execute(
@@ -422,7 +422,7 @@ pub mod presence {
     use rusqlite::Row;
     use std::collections::HashMap;
     use std::iter::FromIterator;
-    use std::sync::mpsc::{channel, Sender, TryRecvError};
+    use std::sync::mpsc::{sync_channel, SyncSender, TryRecvError};
     use std::sync::{Arc, Mutex};
     use std::thread;
     use std::time::Duration;
@@ -477,9 +477,10 @@ pub mod presence {
 
     pub fn start_tracker(
         shared_con: Arc<Mutex<DbCon>>,
-        mqtt: Option<Sender<TypedAction>>,
-    ) -> Sender<String> {
-        let (tx, rx) = channel::<String>();
+        mqtt: Option<&SyncSender<TypedAction>>,
+    ) -> SyncSender<String> {
+        let (tx, rx) = sync_channel::<String>(10);
+        let mqtt = mqtt.map(|s| s.clone());
         thread::Builder::new()
             .name(String::from("presence_tracker"))
             .spawn(move || {
@@ -549,7 +550,7 @@ pub mod presence {
                         let mut presence_action =
                             PresenceAction::new(String::from(""), present_users);
                         let transaction = con.transaction().unwrap();
-                        presence_action.store(&transaction, &mqtt);
+                        presence_action.store(&transaction, mqtt.as_ref());
                         transaction.commit().unwrap();
                         changed = false;
                     }
@@ -563,7 +564,7 @@ pub mod presence {
                         }
                     }
 
-                    thread::sleep(Duration::new(20, 0)); // create one presence action every 20s
+                    thread::sleep(Duration::new(20, 0)); // create one presence action at most every 20s
 
                     // add requests to user list
                     now = Utc::now().timestamp();

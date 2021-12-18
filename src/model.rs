@@ -1,6 +1,6 @@
 use chrono::Utc;
 use regex::Regex;
-use rocket::serde::Serialize;
+use rocket::serde::{Deserialize, Serialize};
 use rustc_serialize::json::{Json, Object, ToJson};
 
 use crate::db::DbStored;
@@ -50,7 +50,7 @@ pub struct StatusAction {
     pub status: Status,
 }
 
-#[derive(Clone, Debug, PartialEq, Serialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Deserialize, Serialize)]
 #[serde(rename_all = "lowercase")]
 pub enum Status {
     Public,
@@ -114,7 +114,7 @@ pub struct AnnouncementAction {
     pub public: bool,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Serialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum AnnouncementMethod {
     New,

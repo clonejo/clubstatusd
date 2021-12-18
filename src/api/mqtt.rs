@@ -1,4 +1,4 @@
-use std::sync::mpsc::{channel, Sender, TryRecvError};
+use std::sync::mpsc::{channel, sync_channel, Sender, SyncSender, TryRecvError};
 use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::Duration;
@@ -91,8 +91,8 @@ pub fn start_handler(
     port: u16,
     topic_prefix: String,
     shared_con: Arc<Mutex<DbCon>>,
-) -> Option<Sender<TypedAction>> {
-    let (tx, rx) = channel::<TypedAction>();
+) -> Option<SyncSender<TypedAction>> {
+    let (tx, rx) = sync_channel::<TypedAction>(10);
     match server {
         Some(server_str) => {
             thread::Builder::new()

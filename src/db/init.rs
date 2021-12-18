@@ -95,10 +95,10 @@ fn insert_initial_status(tx: &Transaction) {
         "Hans Acker".into(),
         Status::Closed,
     );
-    status_action.store(tx, &None).unwrap();
+    status_action.store(tx, None).unwrap();
 }
 
 fn insert_initial_presence(tx: &Transaction) {
     let mut presence_action = PresenceAction::new_with_time("initial state".into(), 0, vec![]);
-    presence_action.store(tx, &None).unwrap();
+    presence_action.store(tx, None).unwrap();
 }

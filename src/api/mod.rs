@@ -3,23 +3,27 @@ use std::cmp::{min, Ordering};
 use std::collections::HashMap;
 use std::convert::TryInto;
 use std::error::Error;
+use std::fmt;
 use std::io::Cursor;
 use std::io::Read;
 use std::net::ToSocketAddrs;
 use std::num::ParseIntError;
 use std::str;
 use std::str::FromStr;
-use std::sync::mpsc::Sender;
+use std::sync::mpsc::{Sender, SyncSender};
 use std::sync::{Arc, Mutex};
 
 use chrono::{Datelike, TimeZone, Utc};
 use cookie::Expiration;
 use rocket::config::Config;
+use rocket::data::{self, Data, FromData, ToByteUnit};
+use rocket::http::ContentType;
 use rocket::http::{self, Header};
 use rocket::http::{Cookie, CookieJar, SameSite};
 use rocket::request::{self, FromRequest, Request};
 use rocket::response::{self, content, Responder, Response};
-use rocket::serde::Serialize;
+use rocket::serde::de::{self, Visitor};
+use rocket::serde::{Deserialize, Deserializer, Serialize};
 use rocket::{Build, Rocket, State};
 use rocket_basicauth::BasicAuth;
 //use hyper::header;
@@ -36,6 +40,7 @@ use spaceapi::Status as SpaceapiStatus;
 
 use crate::db;
 use crate::db::DbCon;
+use crate::db::DbStored;
 use crate::model::Status;
 use crate::model::{
     json_to_object, parse_time_string, AnnouncementAction, AnnouncementMethod, BaseAction,
@@ -94,14 +99,10 @@ pub fn run(
     listen: &str,
     password: Option<String>,
     cookie_salt: Salt,
-    mqtt: Option<Sender<TypedAction>>,
+    mqtt: Option<SyncSender<TypedAction>>,
     spaceapi_static: Option<SpaceapiStatus>,
 ) -> Rocket<Build> {
-    let mqtt_arc = Arc::new(Mutex::new(mqtt.clone()));
-    let presence_tracker = Arc::new(Mutex::new(db::presence::start_tracker(
-        shared_con.clone(),
-        mqtt,
-    )));
+    let presence_tracker = db::presence::start_tracker(shared_con.clone(), mqtt.as_ref());
 
     let auth_secrets = password.map(|p| AuthSecrets {
         cookie: generate_cookie(&cookie_salt, p.as_str()),
@@ -115,12 +116,15 @@ pub fn run(
 
     let mut rocket = rocket::custom(config)
         .manage(shared_con)
-        .manage(dbg!(auth_secrets))
+        .manage(auth_secrets)
+        .manage(presence_tracker)
+        .manage(mqtt)
+        .register("/", catchers![unauthorized_catcher,])
         .mount(
             "/",
             routes![
                 api_versions,
-                //create_action,
+                create_action,
                 //query,
                 status_current,
                 status_current_public,
@@ -280,6 +284,23 @@ fn clear_auth_cookie(cookie_jar: &CookieJar) {
     set_auth_cookie(cookie_jar, "");
 }
 
+#[catch(401)]
+fn unauthorized_catcher<'r, 'o: 'r>() -> impl Responder<'r, 'o> {
+    struct Resp {}
+    impl<'r, 'o: 'r> Responder<'r, 'o> for Resp {
+        fn respond_to(
+            self,
+            _request: &Request,
+        ) -> Result<rocket::Response<'o>, rocket::http::Status> {
+            let mut res = Response::build();
+            res.header(Header::new("WWW-Authenticate", "Basic"));
+            res.status(http::Status::Unauthorized);
+            Ok(res.finalize())
+        }
+    }
+    Resp {}
+}
+
 fn parse_get_params<'a>(get_params_str: Option<String>) -> GetParams<'a> {
     let mut params = HashMap::new();
     if let Some(ref params_str) = get_params_str {
@@ -321,60 +342,257 @@ struct ApiVersions {
 
 #[get("/api/versions")]
 fn api_versions<'a>() -> RestResponder<ApiVersions> {
-    RestResponder::new(AuthRequired::Public, ApiVersions { versions: vec![0] })
+    RestResponder::new(
+        AuthRequired::Public,
+        http::Status::Ok,
+        ApiVersions { versions: vec![0] },
+    )
 }
 
-/* *
- * PUT
- */
-//fn create_action(
-//    mut pr: ParsedRequest,
-//    mut res: Response,
-//    shared_con: Arc<Mutex<DbCon>>,
-//    presence_tracker: Arc<Mutex<Sender<String>>>,
-//    mqtt: Arc<Mutex<Option<Sender<TypedAction>>>>,
-//) {
-//    if !pr.authenticated {
-//        send_unauthorized(res);
-//        return;
-//    }
-//    // parse at maximum 1k bytes
-//    let action_buf = &mut [0; 1024];
-//    let bytes_read = pr.req.read(action_buf).unwrap();
-//    let (action_buf, _) = action_buf.split_at(bytes_read);
-//    let action_str = str::from_utf8(action_buf).unwrap();
-//    match Json::from_str(action_str) {
-//        Err(_) => send_status(res, StatusCode::BadRequest),
-//        Ok(action_json) => {
-//            let now = Utc::now().timestamp();
-//            match json_to_object(action_json, now) {
-//                Ok(RequestObject::Action(mut action)) => {
-//                    let mut con = shared_con.lock().unwrap();
-//                    let transaction = con.transaction().unwrap();
-//                    match action.store(&transaction, &*mqtt.lock().unwrap()) {
-//                        Some(action_id) => {
-//                            {
-//                                let headers = res.headers_mut();
-//                                headers.set(header::ContentType::json());
-//                            }
-//                            let mut resp_str = format!("{}", action_id);
-//                            resp_str.push('\n');
-//                            res.send(resp_str.as_bytes()).unwrap();
-//                        }
-//                        None => send(res, StatusCode::BadRequest, b"bad request"),
-//                    }
-//                    transaction.commit().unwrap();
-//                }
-//                Ok(RequestObject::PresenceRequest(username)) => {
-//                    presence_tracker.lock().unwrap().send(username).unwrap();
-//                }
-//                Err(msg) => {
-//                    send(res, StatusCode::BadRequest, msg.as_bytes());
-//                }
-//            }
-//        }
-//    }
-//}
+#[derive(Deserialize)]
+#[serde(tag = "type", rename_all = "lowercase")]
+enum ActionRequest {
+    Status(StatusRequest),
+    Announcement(AnnouncementRequest),
+    Presence(PresenceRequest),
+}
+#[derive(Debug)]
+enum ActionRequestError {
+    TooLarge,
+    Io(std::io::Error),
+    JsonError(serde_json::Error),
+}
+#[rocket::async_trait]
+impl<'r> FromData<'r> for ActionRequest {
+    type Error = ActionRequestError;
+
+    async fn from_data(req: &'r Request<'_>, data: Data<'r>) -> data::Outcome<'r, Self> {
+        use rocket::outcome::Outcome::*;
+        use ActionRequestError::*;
+
+        // Ensure the content type is correct before opening the data.
+        let json_content_type = ContentType::new("application", "json");
+        if req.content_type() != Some(&json_content_type) {
+            return Forward(data);
+        }
+
+        // Read the data into a string.
+        let string = match data.open(1024.bytes()).into_string().await {
+            Ok(string) if string.is_complete() => string.into_inner(),
+            Ok(_) => return Failure((http::Status::PayloadTooLarge, TooLarge)),
+            Err(e) => return Failure((http::Status::InternalServerError, Io(e))),
+        };
+
+        let request = match serde_json::from_str(string.as_str()) {
+            Ok(j) => j,
+            Err(e) => return Failure((http::Status::UnprocessableEntity, JsonError(e))),
+        };
+
+        Success(request)
+    }
+}
+
+#[derive(Deserialize)]
+struct StatusRequest {
+    user: UserName,
+    status: Status,
+    note: Note,
+}
+#[derive(Deserialize)]
+struct AnnouncementRequest {
+    user: UserName,
+    note: Note,
+    aid: Option<u64>,
+    method: AnnouncementMethod,
+    from: i64,
+    to: i64,
+    public: bool,
+}
+#[derive(Deserialize)]
+struct PresenceRequest {
+    user: UserName,
+}
+struct UserName(String);
+impl<'de> Deserialize<'de> for UserName {
+    fn deserialize<D>(deserializer: D) -> Result<UserName, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        deserializer.deserialize_str(UserNameVisitor)
+    }
+}
+struct UserNameVisitor;
+impl<'de> Visitor<'de> for UserNameVisitor {
+    type Value = UserName;
+
+    fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+        formatter.write_str("Usernames must be UTF-8 encoded, and 1-15 bytes.")
+    }
+
+    fn visit_str<E>(self, value: &str) -> Result<Self::Value, E>
+    where
+        E: de::Error,
+    {
+        let user = String::from(value);
+        if user.len() == 0 || user.len() > 15 {
+            return Err(E::custom(format!(
+                "Username '{}' is either empty or longer than 15 bytes.",
+                user
+            )));
+        }
+        Ok(UserName(user))
+    }
+}
+struct Note(String);
+impl<'de> Deserialize<'de> for Note {
+    fn deserialize<D>(deserializer: D) -> Result<Note, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        deserializer.deserialize_str(NoteVisitor)
+    }
+}
+struct NoteVisitor;
+impl<'de> Visitor<'de> for NoteVisitor {
+    type Value = Note;
+
+    fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+        formatter.write_str("Note must be UTF-8 encoded, and no longer than 80 bytes.")
+    }
+
+    fn visit_str<E>(self, value: &str) -> Result<Self::Value, E>
+    where
+        E: de::Error,
+    {
+        let note = String::from(value);
+        if note.len() > 15 {
+            return Err(E::custom(format!(
+                "Note '{}' cannot be longer than 80 bytes.",
+                note
+            )));
+        }
+        Ok(Note(note))
+    }
+}
+impl DbStored for StatusRequest {
+    fn store(
+        &mut self,
+        transaction: &rusqlite::Transaction<'_>,
+        mqtt: Option<&SyncSender<TypedAction>>,
+    ) -> Option<u64> {
+        StatusAction {
+            action: BaseAction {
+                id: None,
+                note: self.note.0.clone(),
+                time: Utc::now().timestamp(),
+            },
+            status: self.status,
+            user: self.user.0.clone(),
+        }
+        .store(transaction, mqtt)
+    }
+}
+impl DbStored for AnnouncementRequest {
+    fn store(
+        &mut self,
+        transaction: &rusqlite::Transaction<'_>,
+        mqtt: Option<&SyncSender<TypedAction>>,
+    ) -> Option<u64> {
+        AnnouncementAction {
+            action: BaseAction {
+                id: None,
+                note: self.note.0.clone(),
+                time: Utc::now().timestamp(),
+            },
+            aid: self.aid,
+            method: self.method,
+            from: self.from,
+            to: self.to,
+            user: self.user.0.clone(),
+            public: self.public,
+        }
+        .store(transaction, mqtt)
+    }
+}
+
+#[derive(Serialize)]
+enum CreateActionResponse {
+    ActionCreated(u64),
+    PresenceRecorded,
+    Error,
+}
+
+// IDEA: add a new version of endpoint, which returns the full action that was created
+#[put("/api/v0", data = "<action_request>")]
+fn create_action(
+    _authenticated: Authenticated,
+    shared_con: &State<Arc<Mutex<DbCon>>>,
+    presence_tracker: &State<SyncSender<String>>,
+    mqtt: &State<Option<SyncSender<TypedAction>>>,
+    action_request: Result<ActionRequest, ActionRequestError>,
+) -> Result<RestResponder<CreateActionResponse>, JsonErrorResponder> {
+    let action_request = match action_request {
+        Ok(ar) => ar,
+        Err(ActionRequestError::JsonError(err)) => {
+            return Err(JsonErrorResponder::new(err));
+        }
+        Err(_) => {
+            return Ok(RestResponder::new(
+                AuthRequired::Required,
+                http::Status::InternalServerError,
+                CreateActionResponse::Error,
+            ))
+        }
+    };
+    match action_request {
+        ActionRequest::Status(mut action) => {
+            let mut con = shared_con.lock().unwrap();
+            let transaction = con.transaction().unwrap();
+            match action.store(&transaction, mqtt.as_ref()) {
+                Some(action_id) => {
+                    transaction.commit().unwrap();
+                    Ok(RestResponder::new(
+                        AuthRequired::Required,
+                        http::Status::Ok,
+                        CreateActionResponse::ActionCreated(action_id),
+                    ))
+                }
+                None => Ok(RestResponder::new(
+                    AuthRequired::Required,
+                    http::Status::InternalServerError,
+                    CreateActionResponse::Error,
+                )),
+            }
+        }
+        ActionRequest::Announcement(mut action) => {
+            let mut con = shared_con.lock().unwrap();
+            let transaction = con.transaction().unwrap();
+            match action.store(&transaction, mqtt.as_ref()) {
+                Some(action_id) => {
+                    transaction.commit().unwrap();
+                    Ok(RestResponder::new(
+                        AuthRequired::Required,
+                        http::Status::Ok,
+                        CreateActionResponse::ActionCreated(action_id),
+                    ))
+                }
+                None => Ok(RestResponder::new(
+                    AuthRequired::Required,
+                    http::Status::InternalServerError,
+                    CreateActionResponse::Error,
+                )),
+            }
+        }
+        ActionRequest::Presence(PresenceRequest { user: username }) => {
+            presence_tracker.send(username.0).unwrap();
+            Ok(RestResponder::new(
+                AuthRequired::Required,
+                http::Status::Ok,
+                CreateActionResponse::PresenceRecorded,
+            ))
+        }
+    }
+}
 
 #[get("/api/v0/status/current")]
 fn status_current(
@@ -385,7 +603,7 @@ fn status_current(
     let last = db::status::get_last(&*con).unwrap();
     let changed = db::status::get_last_changed(&*con).unwrap();
     let status_current = StatusCurrent { last, changed };
-    RestResponder::new(AuthRequired::Required, status_current)
+    RestResponder::new(AuthRequired::Required, http::Status::Ok, status_current)
 }
 #[get("/api/v0/status/current?public")]
 fn status_current_public(
@@ -397,7 +615,7 @@ fn status_current_public(
         .unwrap()
         .to_public();
     let status_current = StatusCurrentPublic { changed };
-    RestResponder::new(AuthRequired::Public, status_current)
+    RestResponder::new(AuthRequired::Public, http::Status::Ok, status_current)
 }
 #[derive(Serialize)]
 struct StatusCurrent {
@@ -427,12 +645,14 @@ impl Default for AuthRequired {
  */
 struct RestResponder<J: Serialize> {
     auth_required: AuthRequired,
+    status: http::Status,
     response: J,
 }
 impl<J: Serialize> RestResponder<J> {
-    fn new(auth_required: AuthRequired, response: J) -> Self {
+    fn new(auth_required: AuthRequired, status: http::Status, response: J) -> Self {
         RestResponder {
             auth_required,
+            status,
             response,
         }
     }
@@ -448,15 +668,30 @@ impl<'r, 'o: 'r, J: Serialize> Responder<'r, 'o> for RestResponder<J> {
         if self.auth_required == AuthRequired::Public {
             res.header(Header::new("Access-Control-Allow-Origin", "*"));
         }
-        res.status(http::Status::Ok)
+        res.status(self.status)
             .sized_body(json_str.len(), Cursor::new(json_str));
         Ok(res.finalize())
     }
-    //let accessControlAllowOrigin = if auth_required {
-    //    None
-    //} else {
-    //    Some()
-    //};
+}
+struct JsonErrorResponder {
+    error: serde_json::Error,
+}
+impl JsonErrorResponder {
+    fn new(error: serde_json::Error) -> Self {
+        JsonErrorResponder { error }
+    }
+}
+impl<'r, 'o: 'r> Responder<'r, 'o> for JsonErrorResponder {
+    fn respond_to(
+        self,
+        _req: &'r rocket::Request<'_>,
+    ) -> Result<rocket::Response<'o>, rocket::http::Status> {
+        let error_string = self.error.to_string();
+        let mut res = Response::build();
+        res.status(http::Status::UnprocessableEntity)
+            .sized_body(error_string.len(), Cursor::new(error_string));
+        Ok(res.finalize())
+    }
 }
 
 //fn announcement_current(
@@ -689,7 +924,7 @@ fn spaceapi_(
     status.state.open = Some(changed_action.status == Status::Public);
     status.state.lastchange = Some(changed_action.action.time.try_into().unwrap());
 
-    RestResponder::new(AuthRequired::Public, status)
+    RestResponder::new(AuthRequired::Public, http::Status::Ok, status)
 }
 
 #[derive(Debug, Serialize)]
