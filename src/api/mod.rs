@@ -129,7 +129,8 @@ pub fn run(
                 //query,
                 status_current,
                 status_current_public,
-                //announcement_current
+                announcement_current,
+                announcement_current_public,
             ],
         );
 
@@ -774,40 +775,39 @@ impl<'r, 'o: 'r> Responder<'r, 'o> for JsonErrorResponder {
     }
 }
 
-//fn announcement_current(
-//    pr: ParsedRequest,
-//    mut res: Response,
-//    shared_con: Arc<Mutex<DbCon>>,
-//    _: Arc<Mutex<Sender<String>>>,
-//    _: Arc<Mutex<Option<Sender<TypedAction>>>>,
-//) {
-//    let get_params = parse_get_params(pr.get_params_str);
-//    let public_api = get_params.contains_key("public");
-//    if !public_api && !pr.authenticated {
-//        send_unauthorized(res);
-//        return;
-//    }
-//
-//    let mut obj = Object::new();
-//    let con = shared_con.lock().unwrap();
-//    let actions = if public_api {
-//        db::announcements::get_current_public(&*con)
-//    } else {
-//        db::announcements::get_current(&*con)
-//    };
-//    obj.insert("actions".into(), actions.unwrap().to_json());
-//
-//    {
-//        let headers = res.headers_mut();
-//        headers.set(header::ContentType::json());
-//        if public_api {
-//            headers.set(header::AccessControlAllowOrigin::Any);
-//        }
-//    }
-//    let mut resp_str = obj.to_json().to_string();
-//    resp_str.push('\n');
-//    res.send(resp_str.as_bytes()).unwrap();
-//}
+#[derive(Serialize)]
+#[serde(rename_all = "snake_case")]
+struct CurrentAnnouncements {
+    actions: Vec<AnnouncementAction>,
+}
+#[get("/api/v0/announcement/current")]
+fn announcement_current(
+    _authenticated: Authenticated,
+    shared_con: &State<Arc<Mutex<DbCon>>>,
+) -> RestResponder<CurrentAnnouncements> {
+    let con = shared_con.lock().unwrap();
+    let actions = db::announcements::get_current(&*con).unwrap();
+    let r = CurrentAnnouncements { actions };
+    RestResponder::new(AuthRequired::Required, http::Status::Ok, r)
+}
+#[derive(Serialize)]
+#[serde(rename_all = "snake_case")]
+struct CurrentPublicAnnouncements {
+    actions: Vec<PublicAnnouncementAction>,
+}
+#[get("/api/v0/announcement/current?public")]
+fn announcement_current_public(
+    shared_con: &State<Arc<Mutex<DbCon>>>,
+) -> RestResponder<CurrentPublicAnnouncements> {
+    let con = shared_con.lock().unwrap();
+    let actions = db::announcements::get_current_public(&*con)
+        .unwrap()
+        .iter()
+        .map(|a| a.to_public())
+        .collect();
+    let r = CurrentPublicAnnouncements { actions };
+    RestResponder::new(AuthRequired::Public, http::Status::Ok, r)
+}
 
 #[derive(Debug)]
 pub enum RangeExpr<T> {
