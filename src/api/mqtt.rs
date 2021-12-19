@@ -1,4 +1,4 @@
-use std::sync::mpsc::{channel, sync_channel, Sender, SyncSender, TryRecvError};
+use std::sync::mpsc::{sync_channel, SyncSender, TryRecvError};
 use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::Duration;

@@ -1,41 +1,32 @@
-use std::any::Any;
 use std::cmp::{min, Ordering};
-use std::collections::HashMap;
 use std::convert::TryInto;
-use std::error::Error;
 use std::fmt;
 use std::io::Cursor;
-use std::io::Read;
 use std::net::ToSocketAddrs;
 use std::num::ParseIntError;
 use std::str;
 use std::str::FromStr;
-use std::sync::mpsc::{Sender, SyncSender};
+use std::sync::mpsc::SyncSender;
 use std::sync::{Arc, Mutex};
 
 use chrono::{Datelike, TimeZone, Utc};
-use cookie::Expiration;
 use regex::Regex;
-use rocket::config::Config;
 use rocket::data::{self, Data, FromData, ToByteUnit};
 use rocket::form::{self, FromFormField, ValueField};
-use rocket::http::ContentType;
 use rocket::http::{self, Header};
-use rocket::http::{Cookie, CookieJar, SameSite};
+use rocket::http::{Cookie, CookieJar};
 use rocket::request::{self, FromRequest, Request};
-use rocket::response::{self, content, Responder, Response};
+use rocket::response::{Responder, Response};
 use rocket::serde::de::{self, Visitor};
 use rocket::serde::{Deserialize, Deserializer, Serialize};
-use rocket::{Build, Rocket, State};
+use rocket::{Build, Config, Rocket, State};
 use rocket_basicauth::BasicAuth;
 //use hyper::header;
 //use hyper::method::Method;
 //use hyper::server::{Request, Response, Server};
 //use hyper::status::StatusCode;
 //use hyper::uri::RequestUri;
-use route_recognizer::{Match, Params, Router};
 use rustc_serialize::hex::ToHex;
-use rustc_serialize::json::{Json, Object, ToJson};
 use sodiumoxide::crypto::pwhash;
 use sodiumoxide::crypto::pwhash::Salt;
 use spaceapi::Status as SpaceapiStatus;
@@ -45,56 +36,10 @@ use crate::db::DbCon;
 use crate::db::DbStored;
 use crate::model::Status;
 use crate::model::{
-    json_to_object, parse_time_string, AnnouncementAction, AnnouncementMethod, BaseAction,
-    QueryActionType, RequestObject, StatusAction, TypedAction,
+    AnnouncementAction, AnnouncementMethod, BaseAction, QueryActionType, StatusAction, TypedAction,
 };
 
 pub mod mqtt;
-
-//trait Handler: Sync + Send + Any {
-//    fn handle(
-//        &self,
-//        pr: ParsedRequest,
-//        res: Response,
-//        con: Arc<Mutex<DbCon>>,
-//        presence_tracker: Arc<Mutex<Sender<String>>>,
-//        mqtt: Arc<Mutex<Option<Sender<TypedAction>>>>,
-//    );
-//}
-
-//impl<F> Handler for F
-//where
-//    F: Send
-//        + Sync
-//        + Any
-//        + Fn(
-//            ParsedRequest,
-//            Response,
-//            Arc<Mutex<DbCon>>,
-//            Arc<Mutex<Sender<String>>>,
-//            Arc<Mutex<Option<Sender<TypedAction>>>>,
-//        ),
-//{
-//    fn handle(
-//        &self,
-//        pr: ParsedRequest,
-//        res: Response,
-//        con: Arc<Mutex<DbCon>>,
-//        presence_tracker: Arc<Mutex<Sender<String>>>,
-//        mqtt: Arc<Mutex<Option<Sender<TypedAction>>>>,
-//    ) {
-//        (*self)(pr, res, con, presence_tracker, mqtt);
-//    }
-//}
-
-type GetParams<'a> = HashMap<String, Option<String>>;
-
-//struct ParsedRequest<'a, 'b: 'a> {
-//    req: Request<'a, 'b>,
-//    path_params: Params,
-//    get_params_str: Option<String>,
-//    authenticated: bool,
-//}
 
 pub fn run(
     shared_con: Arc<Mutex<DbCon>>,
@@ -135,75 +80,10 @@ pub fn run(
             ],
         );
 
-    //let mut router: Router<(Method, Box<dyn Handler>)> = Router::new();
-    //router.add("/api/versions", (Method::Get, Box::new(api_versions)));
-    //router.add("/api/v0", (Method::Put, Box::new(create_action)));
-    //router.add("/api/v0/:type", (Method::Get, Box::new(query)));
-    //router.add(
-    //    "/api/v0/status/current",
-    //    (Method::Get, Box::new(status_current)),
-    //);
-    //router.add(
-    //    "/api/v0/announcement/current",
-    //    (Method::Get, Box::new(announcement_current)),
-    //);
     if let Some(s) = spaceapi_static {
         rocket = rocket.manage(s).mount("/", routes![spaceapi_]);
     }
 
-    //Server::http(listen)
-    //    .unwrap()
-    //    .handle(move |req: Request, mut res: Response| {
-    //        let (match_result, get_params_string) = {
-    //            let uri_str = match req.uri {
-    //                RequestUri::AbsolutePath(ref p) => p,
-    //                _ => panic!(),
-    //            };
-    //            let (path_str, get_params_str) = split_uri(uri_str);
-    //            (router.recognize(path_str), get_params_str.map(String::from))
-    //        };
-    //        match match_result {
-    //            Ok(Match {
-    //                handler: tup,
-    //                params,
-    //            }) => {
-    //                let &(ref method, ref handler): &(Method, Box<dyn Handler>) = tup;
-    //                let authenticated = match pass_cookie {
-    //                    None => true,
-    //                    Some((ref pass_str, ref cookie)) => {
-    //                        check_authentication(&req, pass_str, cookie)
-    //                    }
-    //                };
-    //                if let Some((_, ref cookie)) = pass_cookie {
-    //                    if authenticated {
-    //                        set_auth_cookie(&mut res, cookie.as_str());
-    //                    } else {
-    //                        clear_auth_cookie(&mut res);
-    //                    }
-    //                }
-    //                if *method == req.method {
-    //                    let pr = ParsedRequest {
-    //                        req,
-    //                        path_params: params,
-    //                        // would be nicer to just put a reference into req here, but idk how:
-    //                        get_params_str: get_params_string,
-    //                        authenticated,
-    //                    };
-    //                    handler.handle(
-    //                        pr,
-    //                        res,
-    //                        shared_con.clone(),
-    //                        presence_tracker.clone(),
-    //                        mqtt_arc.clone(),
-    //                    );
-    //                } else {
-    //                    send_status(res, StatusCode::MethodNotAllowed);
-    //                }
-    //            }
-    //            Err(_) => send_status(res, StatusCode::NotFound),
-    //        };
-    //    })
-    //    .unwrap();
     rocket
 }
 
@@ -303,40 +183,6 @@ fn unauthorized_catcher<'r, 'o: 'r>() -> impl Responder<'r, 'o> {
     }
     Resp {}
 }
-
-fn parse_get_params<'a>(get_params_str: Option<String>) -> GetParams<'a> {
-    let mut params = HashMap::new();
-    if let Some(ref params_str) = get_params_str {
-        for pair in params_str.split('&') {
-            let mut split = pair.splitn(2, '=');
-            let key = urlparse::unquote_plus(split.next().unwrap()).unwrap();
-            let value = split.next().map(|s| urlparse::unquote_plus(s).unwrap());
-            params.insert(key, value);
-        }
-    }
-    params
-}
-
-//fn send_status(mut res: Response, status: StatusCode) {
-//    let s = res.status_mut();
-//    *s = status;
-//}
-
-//fn send_unauthorized(mut res: Response) {
-//    {
-//        let headers = res.headers_mut();
-//        headers.set_raw("WWW-Authenticate", vec![b"Basic".to_vec()]);
-//    }
-//    send_status(res, StatusCode::Unauthorized);
-//}
-
-//fn send(mut res: Response, status: StatusCode, msg: &[u8]) {
-//    {
-//        let s = res.status_mut();
-//        *s = status;
-//    }
-//    res.send(msg).unwrap();
-//}
 
 #[derive(Serialize)]
 struct ApiVersions {
@@ -832,16 +678,6 @@ impl<T: PartialOrd> RangeExpr<T> {
             RangeExpr::Single(_) => true,
             RangeExpr::Range(_, _) => false,
         }
-    }
-
-    fn map<F, R, E>(&self, f: F) -> Result<RangeExpr<R>, E>
-    where
-        F: Fn(&T) -> Result<R, E>,
-    {
-        Ok(match self {
-            RangeExpr::Single(ref first) => RangeExpr::Single(f(first)?),
-            RangeExpr::Range(ref first, ref second) => RangeExpr::Range(f(first)?, f(second)?),
-        })
     }
 }
 impl<T: FromStr + PartialOrd> FromStr for RangeExpr<T> {
