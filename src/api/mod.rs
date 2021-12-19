@@ -766,7 +766,7 @@ impl<'r, 'o: 'r> Responder<'r, 'o> for JsonErrorResponder {
         self,
         _req: &'r rocket::Request<'_>,
     ) -> Result<rocket::Response<'o>, rocket::http::Status> {
-        let error_string = self.error.to_string();
+        let error_string = format!("{}\n", self.error);
         let mut res = Response::build();
         res.status(http::Status::UnprocessableEntity)
             .sized_body(error_string.len(), Cursor::new(error_string));
