@@ -78,11 +78,8 @@ impl DbStored for StatusAction {
                 )
                 .unwrap();
                 self.action.id = Some(action_id);
-                match mqtt {
-                    Some(ref m) => {
-                        m.send(TypedAction::Status(self.clone())).unwrap();
-                    }
-                    None => {}
+                if let Some(ref m) = mqtt {
+                    m.send(TypedAction::Status(self.clone())).unwrap();
                 }
                 Some(action_id)
             }
