@@ -491,7 +491,14 @@ pub mod presence {
                 }
                 let last_action = {
                     let con = shared_con.lock().unwrap();
-                    get_last(&*con).unwrap()
+                    get_last(&*con).unwrap_or_else(|_e| PresenceAction {
+                        action: BaseAction {
+                            id: Some(0),
+                            note: String::from(""),
+                            time: i64::min_value(),
+                        },
+                        users: vec![],
+                    })
                 };
                 let mut now = Utc::now().timestamp();
                 let mut users: HashMap<String, UserPresence> = HashMap::new();
