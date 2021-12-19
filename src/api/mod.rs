@@ -367,15 +367,9 @@ enum ActionRequestError {
 impl<'r> FromData<'r> for ActionRequest {
     type Error = ActionRequestError;
 
-    async fn from_data(req: &'r Request<'_>, data: Data<'r>) -> data::Outcome<'r, Self> {
+    async fn from_data(_req: &'r Request<'_>, data: Data<'r>) -> data::Outcome<'r, Self> {
         use rocket::outcome::Outcome::*;
         use ActionRequestError::*;
-
-        // Ensure the content type is correct before opening the data.
-        let json_content_type = ContentType::new("application", "json");
-        if req.content_type() != Some(&json_content_type) {
-            return Forward(data);
-        }
 
         // Read the data into a string.
         let string = match data.open(1024.bytes()).into_string().await {
