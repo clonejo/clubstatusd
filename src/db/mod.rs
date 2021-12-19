@@ -78,6 +78,7 @@ impl DbStored for StatusAction {
                 )
                 .unwrap();
                 self.action.id = Some(action_id);
+                println!("Stored new action: {:?}", self);
                 if let Some(ref m) = mqtt {
                     m.send(TypedAction::Status(self.clone())).unwrap();
                 }
@@ -197,6 +198,7 @@ impl DbStored for AnnouncementAction {
                             .unwrap();
                             self.action.id = Some(action_id);
                             self.aid = Some(action_id);
+                            println!("Stored new action: {:?}", self);
                             if let Some(ref m) = mqtt {
                                 m.send(TypedAction::Announcement(self.clone())).unwrap();
                             }
@@ -221,6 +223,7 @@ impl DbStored for AnnouncementAction {
                                     &[&(action_id as i64), &1, &(aid as i64),
                                       &self.user, &self.from, &self.to, &(self.public as i64)]).unwrap();
                             self.action.id = Some(action_id);
+                            println!("Stored new action: {:?}", self);
                             if let Some(ref m) = mqtt {
                                 m.send(TypedAction::Announcement(self.clone())).unwrap();
                             }
@@ -248,6 +251,7 @@ impl DbStored for AnnouncementAction {
                                     &[&(action_id as i64), &2, &(aid as i64),
                                       &self.user, &self.from, &self.to, &(self.public as i64)]).unwrap();
                             self.action.id = Some(action_id);
+                            println!("Stored new action: {:?}", self);
                             if let Some(m) = mqtt {
                                 m.send(TypedAction::Announcement(self.clone())).unwrap();
                             }
@@ -398,6 +402,7 @@ impl DbStored for PresenceAction {
                     }
                 }
                 self.action.id = Some(action_id);
+                println!("Stored new action: {:?}", self);
                 match mqtt {
                     Some(ref m) => {
                         m.send(TypedAction::Presence(self.clone())).unwrap();
