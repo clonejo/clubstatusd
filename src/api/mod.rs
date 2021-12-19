@@ -15,6 +15,7 @@ use std::sync::{Arc, Mutex};
 
 use chrono::{Datelike, TimeZone, Utc};
 use cookie::Expiration;
+use regex::Regex;
 use rocket::config::Config;
 use rocket::data::{self, Data, FromData, ToByteUnit};
 use rocket::http::ContentType;
@@ -404,8 +405,8 @@ struct AnnouncementRequest {
     note: Note,
     aid: Option<u64>,
     method: AnnouncementMethod,
-    from: i64,
-    to: i64,
+    from: Time,
+    to: Time,
     public: bool,
 }
 #[derive(Deserialize)]
@@ -474,6 +475,89 @@ impl<'de> Visitor<'de> for NoteVisitor {
         Ok(Note(note))
     }
 }
+#[derive(Debug)]
+pub enum Time {
+    Timestamp(i64),
+    Relative(i64),
+}
+impl Time {
+    pub fn absolute(&self, now: i64) -> i64 {
+        match self {
+            Time::Timestamp(i) => *i,
+            Time::Relative(i) => now + i,
+        }
+    }
+}
+impl<'de> Deserialize<'de> for Time {
+    fn deserialize<D>(deserializer: D) -> Result<Time, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        deserializer.deserialize_any(TimeVisitor)
+    }
+}
+struct TimeVisitor;
+impl<'de> Visitor<'de> for TimeVisitor {
+    type Value = Time;
+
+    fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+        formatter.write_str("either integer (UNIX timestamp) or a string following the regex \"^now(?:([+-])(\\d+))?$\" (eg. \"now+3600\", meaning \"in 1 hour\")")
+    }
+
+    fn visit_i64<E>(self, value: i64) -> Result<Self::Value, E>
+    where
+        E: de::Error,
+    {
+        Ok(Time::Timestamp(value))
+    }
+
+    fn visit_u64<E>(self, value: u64) -> Result<Self::Value, E>
+    where
+        E: de::Error,
+    {
+        self.visit_i64(
+            value
+                .try_into()
+                .map_err(|_| E::custom("timestamp must fit into 64 bit signed int"))?,
+        )
+    }
+
+    fn visit_f64<E>(self, value: f64) -> Result<Self::Value, E>
+    where
+        E: de::Error,
+    {
+        self.visit_i64(value.round() as i64)
+    }
+
+    fn visit_str<E>(self, value: &str) -> Result<Self::Value, E>
+    where
+        E: de::Error,
+    {
+        if let Ok(i) = value.parse::<i64>() {
+            return self.visit_i64(i);
+        }
+        let re = Regex::new(r"^now(?:([+-])(\d+))?$").unwrap();
+        match re.captures(value) {
+            None => Err(E::custom("bad time specification")),
+            Some(captures) => {
+                let mut i: i64 = captures
+                    .get(2)
+                    .map(|c| c.as_str().parse::<u64>().unwrap() as i64)
+                    .unwrap_or(0);
+                match captures.get(1).map(|c| c.as_str()) {
+                    Some("+") | None => {}
+                    Some("-") => {
+                        i = -i;
+                    }
+                    _ => {
+                        panic!("should be impossible");
+                    }
+                }
+                Ok(Time::Relative(i))
+            }
+        }
+    }
+}
 impl DbStored for StatusRequest {
     fn store(
         &mut self,
@@ -498,16 +582,17 @@ impl DbStored for AnnouncementRequest {
         transaction: &rusqlite::Transaction<'_>,
         mqtt: Option<&SyncSender<TypedAction>>,
     ) -> Option<u64> {
+        let now = Utc::now().timestamp();
         AnnouncementAction {
             action: BaseAction {
                 id: None,
                 note: self.note.0.clone(),
-                time: Utc::now().timestamp(),
+                time: now,
             },
             aid: self.aid,
             method: self.method,
-            from: self.from,
-            to: self.to,
+            from: self.from.absolute(now),
+            to: self.to.absolute(now),
             user: self.user.0.clone(),
             public: self.public,
         }
@@ -516,6 +601,7 @@ impl DbStored for AnnouncementRequest {
 }
 
 #[derive(Serialize)]
+#[serde(untagged)]
 enum CreateActionResponse {
     ActionCreated(u64),
     PresenceRecorded,

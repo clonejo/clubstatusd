@@ -1,16 +1,24 @@
 #[allow(unused_imports)]
-use crate::model::*;
+use crate::api::*;
 
 #[test]
 fn parse_time_string_tests() {
-    assert_eq!(parse_time_string("-0", 0), Ok(0));
-    assert_eq!(parse_time_string("-12", 0), Ok(-12));
+    fn parse_time_string(time_str: &str, now: i64) -> Option<i64> {
+        serde_json::from_str::<Time>(time_str)
+            .map(|t| t.absolute(now))
+            .ok()
+    }
+    assert_eq!(parse_time_string(r#"-0"#, 0), Some(0));
+    assert_eq!(parse_time_string(r#"-12"#, 0), Some(-12));
+    assert_eq!(parse_time_string(r#""-0""#, 0), Some(0));
+    assert_eq!(parse_time_string(r#""-12""#, 0), Some(-12));
     assert_eq!(
-        parse_time_string("9223372036854775808", 0),
-        Err("bad time specification".into())
+        parse_time_string(r#""9223372036854775807""#, 0),
+        Some(9223372036854775807)
     );
-    assert_eq!(parse_time_string("now", 123), Ok(123));
-    assert_eq!(parse_time_string("now+3", 123), Ok(126));
-    assert_eq!(parse_time_string("now+0", 123), Ok(123));
-    assert_eq!(parse_time_string("now-3", 123), Ok(120));
+    assert_eq!(parse_time_string(r#""9223372036854775808""#, 0), None);
+    assert_eq!(parse_time_string(r#""now""#, 123), Some(123));
+    assert_eq!(parse_time_string(r#""now+3""#, 123), Some(126));
+    assert_eq!(parse_time_string(r#""now+0""#, 123), Some(123));
+    assert_eq!(parse_time_string(r#""now-3""#, 123), Some(120));
 }
