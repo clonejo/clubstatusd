@@ -18,6 +18,7 @@ use cookie::Expiration;
 use regex::Regex;
 use rocket::config::Config;
 use rocket::data::{self, Data, FromData, ToByteUnit};
+use rocket::form::{self, FromFormField, ValueField};
 use rocket::http::ContentType;
 use rocket::http::{self, Header};
 use rocket::http::{Cookie, CookieJar, SameSite};
@@ -126,7 +127,7 @@ pub fn run(
             routes![
                 api_versions,
                 create_action,
-                //query,
+                query,
                 status_current,
                 status_current_public,
                 announcement_current,
@@ -843,7 +844,6 @@ impl<T: PartialOrd> RangeExpr<T> {
         })
     }
 }
-
 impl<T: FromStr + PartialOrd> FromStr for RangeExpr<T> {
     type Err = T::Err;
 
@@ -856,6 +856,18 @@ impl<T: FromStr + PartialOrd> FromStr for RangeExpr<T> {
         })
     }
 }
+#[rocket::async_trait]
+impl<'r> FromFormField<'r> for RangeExpr<IdExpr> {
+    fn from_value(field: ValueField<'r>) -> form::Result<'r, Self> {
+        Ok(Self::from_str(field.value).unwrap())
+    }
+}
+#[rocket::async_trait]
+impl<'r> FromFormField<'r> for RangeExpr<i64> {
+    fn from_value(field: ValueField<'r>) -> form::Result<'r, Self> {
+        Ok(Self::from_str(field.value).unwrap())
+    }
+}
 
 #[derive(Debug, PartialEq)]
 pub enum IdExpr {
@@ -865,7 +877,7 @@ pub enum IdExpr {
 
 impl PartialOrd for IdExpr {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        use crate::api::IdExpr::*;
+        use IdExpr::*;
 
         match (self, other) {
             (&Int(i1), &Int(i2)) => i1.partial_cmp(&i2),
@@ -892,103 +904,64 @@ pub enum Take {
     First,
     Last,
 }
+#[rocket::async_trait]
+impl<'r> FromFormField<'r> for Take {
+    fn from_value(field: ValueField<'r>) -> form::Result<'r, Self> {
+        match field.value {
+            "first" => Ok(Take::First),
+            "last" => Ok(Take::Last),
+            _ => Err(form::Error::validation("take must be either 'first' or 'last'").into()),
+        }
+    }
+    fn default() -> Option<Self> {
+        Some(Take::Last)
+    }
+}
 
-//fn query(
-//    pr: ParsedRequest,
-//    mut res: Response,
-//    shared_con: Arc<Mutex<DbCon>>,
-//    _: Arc<Mutex<Sender<String>>>,
-//    _: Arc<Mutex<Option<Sender<TypedAction>>>>,
-//) {
-//    if !pr.authenticated {
-//        send_unauthorized(res);
-//        return;
-//    }
-//
-//    let type_ = match pr.path_params.find("type").unwrap() {
-//        "all" => QueryActionType::All,
-//        "status" => QueryActionType::Status,
-//        "announcement" => QueryActionType::Announcement,
-//        "presence" => QueryActionType::Presence,
-//        _ => {
-//            send(res, StatusCode::BadRequest, b"bad action type");
-//            return;
-//        }
-//    };
-//
-//    let get_params = parse_get_params(pr.get_params_str);
-//    let id: RangeExpr<IdExpr> = match get_params.get("id") {
-//        None => RangeExpr::range(IdExpr::Int(0), IdExpr::Last),
-//        Some(&None) => RangeExpr::range(IdExpr::Int(0), IdExpr::Last),
-//        Some(&Some(ref s)) => match s.parse() {
-//            Ok(id) => id,
-//            Err(_) => {
-//                send(res, StatusCode::BadRequest, b"bad parameter: id");
-//                return;
-//            }
-//        },
-//    };
-//    let time: RangeExpr<i64> = match get_params.get("time") {
-//        None => RangeExpr::range(i64::min_value(), i64::max_value()),
-//        Some(&None) => RangeExpr::range(i64::min_value(), i64::max_value()),
-//        Some(&Some(ref s)) => match s.parse::<RangeExpr<String>>() {
-//            Ok(t) => {
-//                let now = Utc::now().timestamp();
-//                match t.map(|s| parse_time_string(&*s, now)) {
-//                    Ok(m) => m,
-//                    Err(_) => {
-//                        send(res, StatusCode::BadRequest, b"bad parameter: time");
-//                        return;
-//                    }
-//                }
-//            }
-//            Err(_) => {
-//                send(res, StatusCode::BadRequest, b"bad parameter: time");
-//                return;
-//            }
-//        },
-//    };
-//    let count = match get_params.get("count") {
-//        None => 20,
-//        Some(&None) => 20,
-//        Some(&Some(ref s)) => match s.parse() {
-//            Ok(i) => i,
-//            Err(_) => {
-//                send(res, StatusCode::BadRequest, b"bad parameter: count");
-//                return;
-//            }
-//        },
-//    };
-//    let count: u64 = min(count, 100);
-//    let count = if id.is_single() { 1 } else { count };
-//    let take = match get_params.get("take") {
-//        None => Take::Last,
-//        Some(&None) => Take::Last,
-//        Some(&Some(ref s)) => match &**s {
-//            "first" => Take::First,
-//            "last" => Take::Last,
-//            _ => {
-//                send(res, StatusCode::BadRequest, b"bad parameter: take");
-//                return;
-//            }
-//        },
-//    };
-//
-//    //println!("type: {:?} id: {:?} time: {:?} count: {:?} take: {:?}", type_, id, time, count, take);
-//
-//    let mut obj = Object::new();
-//    let mut con = shared_con.lock().unwrap();
-//    let actions = db::query(type_, id, time, count, take, &mut *con);
-//    obj.insert("actions".into(), actions.unwrap().to_json());
-//
-//    {
-//        let headers = res.headers_mut();
-//        headers.set(header::ContentType::json());
-//    }
-//    let mut resp_str = obj.to_json().to_string();
-//    resp_str.push('\n');
-//    res.send(resp_str.as_bytes()).unwrap();
-//}
+#[derive(FromForm)]
+struct QueryParams {
+    #[field(default = RangeExpr::range(IdExpr::Int(0), IdExpr::Last))]
+    id: RangeExpr<IdExpr>,
+    #[field(default = RangeExpr::range(i64::min_value(), i64::max_value()))]
+    time: RangeExpr<i64>,
+    #[field(default = 20)]
+    count: u64,
+    #[field(default = Take::Last)]
+    take: Take,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "snake_case")]
+struct QueryResponse {
+    actions: Vec<TypedAction>,
+}
+
+#[get("/api/v0/<type>?<params..>")]
+fn query(
+    _authenticated: Authenticated,
+    shared_con: &State<Arc<Mutex<DbCon>>>,
+    r#type: QueryActionType,
+    params: QueryParams,
+) -> RestResponder<QueryResponse> {
+    let QueryParams {
+        id,
+        time,
+        count,
+        take,
+    } = params;
+
+    let count: u64 = min(count, 100);
+    let count = if id.is_single() { 1 } else { count };
+
+    let mut con = shared_con.lock().unwrap();
+    let actions = db::query(r#type, id, time, count, take, &mut *con).unwrap();
+
+    RestResponder::new(
+        AuthRequired::Required,
+        http::Status::Ok,
+        QueryResponse { actions },
+    )
+}
 
 #[get("/spaceapi")]
 fn spaceapi_(

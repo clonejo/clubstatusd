@@ -1,5 +1,6 @@
 use chrono::Utc;
 use regex::Regex;
+use rocket::request::FromParam;
 use rocket::serde::{Deserialize, Serialize};
 use rustc_serialize::json::{Json, Object, ToJson};
 
@@ -40,6 +41,18 @@ pub enum QueryActionType {
     Announcement,
     Presence,
     All,
+}
+impl<'a> FromParam<'a> for QueryActionType {
+    type Error = &'static str;
+    fn from_param(param: &'a str) -> Result<Self, Self::Error> {
+        match param {
+            "status" => Ok(QueryActionType::Status),
+            "announcement" => Ok(QueryActionType::Announcement),
+            "presence" => Ok(QueryActionType::Presence),
+            "all" => Ok(QueryActionType::All),
+            _ => Err("action type must one of  status | announcement | presence | all"),
+        }
+    }
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -231,6 +244,8 @@ impl Action for PresenceAction {
     }
 }
 
+#[derive(Serialize, Debug)]
+#[serde(tag = "type", rename_all = "snake_case")]
 pub enum TypedAction {
     Status(StatusAction),
     Announcement(AnnouncementAction),
