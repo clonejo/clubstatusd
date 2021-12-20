@@ -1,7 +1,6 @@
 use chrono::Utc;
 use rocket::request::FromParam;
 use rocket::serde::{Deserialize, Serialize};
-use rustc_serialize::json::{Json, Object, ToJson};
 
 use crate::db::DbStored;
 
@@ -19,14 +18,6 @@ impl BaseAction {
             time,
             note,
         }
-    }
-
-    fn to_json_obj(&self) -> Object {
-        let mut obj = Object::new();
-        obj.insert("id".into(), self.id.to_json());
-        obj.insert("time".into(), self.time.to_json());
-        obj.insert("note".into(), self.note.to_json());
-        obj
     }
 }
 
@@ -96,33 +87,6 @@ pub enum AnnouncementMethod {
     Del,
 }
 
-impl ToJson for AnnouncementMethod {
-    fn to_json(&self) -> Json {
-        Json::String(
-            match self {
-                AnnouncementMethod::New => "new",
-                AnnouncementMethod::Mod => "mod",
-                AnnouncementMethod::Del => "del",
-            }
-            .into(),
-        )
-    }
-}
-
-impl ToJson for AnnouncementAction {
-    fn to_json(&self) -> Json {
-        let mut obj = self.action.to_json_obj();
-        obj.insert("type".into(), "announcement".to_json());
-        obj.insert("method".into(), self.method.to_json());
-        obj.insert("aid".into(), self.aid.to_json());
-        obj.insert("user".into(), self.user.to_json());
-        obj.insert("from".into(), self.from.to_json());
-        obj.insert("to".into(), self.to.to_json());
-        obj.insert("public".into(), self.public.to_json());
-        Json::Object(obj)
-    }
-}
-
 #[derive(Clone, Debug, Serialize)]
 pub struct PresenceAction {
     #[serde(flatten)]
@@ -156,34 +120,6 @@ pub enum PresentUserStatus {
     Joined,
     Present,
     Left,
-}
-
-impl ToJson for PresentUser {
-    fn to_json(&self) -> Json {
-        let mut obj = Object::new();
-        obj.insert("name".into(), self.name.to_json());
-        obj.insert("since".into(), self.since.to_json());
-        Json::Object(obj)
-    }
-}
-impl ToJson for PresenceAction {
-    fn to_json(&self) -> Json {
-        let mut obj = self.action.to_json_obj();
-        obj.insert("type".into(), "presence".to_json());
-        let json_users: Vec<Json> = self
-            .users
-            .iter()
-            .filter_map(|user| {
-                if user.status == PresentUserStatus::Left {
-                    None
-                } else {
-                    Some(user.to_json())
-                }
-            })
-            .collect();
-        obj.insert("users".into(), json_users.to_json());
-        Json::Object(obj)
-    }
 }
 
 pub trait Action: DbStored {
