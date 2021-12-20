@@ -261,7 +261,6 @@ dependencies = [
  "regex",
  "rocket",
  "rocket-basicauth",
- "route-recognizer",
  "rumqtt",
  "rusqlite",
  "serde 1.0.130",
@@ -269,7 +268,6 @@ dependencies = [
  "sodiumoxide",
  "spaceapi",
  "time 0.1.44",
- "urlparse",
 ]
 
 [[package]]
@@ -1672,12 +1670,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "route-recognizer"
-version = "0.1.13"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ea509065eb0b3c446acdd0102f0d46567dc30902dc0be91d6552035d92b0f4f8"
-
-[[package]]
 name = "rumqtt"
 version = "0.30.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2583,12 +2575,6 @@ name = "untrusted"
 version = "0.6.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "55cd1f4b4e96b46aeb8d4855db4a7a9bd96eeeb5c6a1ab54593328761642ce2f"
-
-[[package]]
-name = "urlparse"
-version = "0.7.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "110352d4e9076c67839003c7788d8604e24dcded13e0b375af3efaa8cf468517"
 
 [[package]]
 name = "uuid"
