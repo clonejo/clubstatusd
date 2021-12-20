@@ -267,7 +267,7 @@ dependencies = [
  "serde_json",
  "sodiumoxide",
  "spaceapi",
- "time 0.1.43",
+ "time 0.2.27",
 ]
 
 [[package]]
