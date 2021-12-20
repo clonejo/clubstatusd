@@ -299,6 +299,7 @@ impl<'de> Visitor<'de> for UserNameVisitor {
         Ok(UserName(user))
     }
 }
+#[derive(Debug, PartialEq)]
 struct Note(String);
 impl<'de> Deserialize<'de> for Note {
     fn deserialize<D>(deserializer: D) -> Result<Note, D::Error>
@@ -321,7 +322,7 @@ impl<'de> Visitor<'de> for NoteVisitor {
         E: de::Error,
     {
         let note = String::from(value);
-        if note.len() > 15 {
+        if note.len() > 80 {
             return Err(E::custom(format!(
                 "Note '{}' cannot be longer than 80 bytes.",
                 note
@@ -965,6 +966,25 @@ mod test {
         assert_eq!(
             generate_cookie(&salt, "foo"),
             "600d731a45dd45bc98b002a2989442c41e73898017f7d4d5ba87d1942fbd3e60"
+        );
+    }
+
+    #[test]
+    fn test_note_deserialize() {
+        assert_eq!(
+            serde_json::from_str::<Note>(
+                r#""👀 Dies ist eine Notiz, genau 80 UTF-8-Bytes lang.1234567890123456789012345678""#
+            ).ok(),
+            Some(Note(
+                "👀 Dies ist eine Notiz, genau 80 UTF-8-Bytes lang.1234567890123456789012345678"
+                    .to_string()
+            ))
+        );
+        assert_eq!(
+            serde_json::from_str::<Note>(
+                r#""👀 Dies ist eine Notiz, weniger als 80 Zeichen, aber über 80 UTF-8-Bytes lang.""#
+            ).ok(),
+            None
         );
     }
 }
