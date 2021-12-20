@@ -26,7 +26,6 @@ use rocket_basicauth::BasicAuth;
 //use hyper::server::{Request, Response, Server};
 //use hyper::status::StatusCode;
 //use hyper::uri::RequestUri;
-use rustc_serialize::hex::ToHex;
 use sodiumoxide::crypto::pwhash;
 use sodiumoxide::crypto::pwhash::Salt;
 use spaceapi::Status as SpaceapiStatus;
@@ -38,6 +37,7 @@ use crate::model::Status;
 use crate::model::{
     AnnouncementAction, AnnouncementMethod, BaseAction, QueryActionType, StatusAction, TypedAction,
 };
+use crate::util::bytes_to_hex;
 
 pub mod mqtt;
 
@@ -148,7 +148,7 @@ fn generate_cookie(cookie_salt: &Salt, password: &str) -> String {
         pwhash::MEMLIMIT_INTERACTIVE,
     )
     .unwrap();
-    (&key[..]).to_hex()
+    bytes_to_hex(&key[..])
 }
 
 fn set_auth_cookie(cookie_jar: &CookieJar, cookie: &str) {

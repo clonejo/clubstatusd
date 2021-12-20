@@ -4,6 +4,7 @@ extern crate rocket;
 mod api;
 mod db;
 mod model;
+mod util;
 
 mod model_tests;
 
