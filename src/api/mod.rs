@@ -199,7 +199,7 @@ fn api_versions<'a>() -> RestResponder<ApiVersions> {
 }
 
 #[derive(Deserialize)]
-#[serde(tag = "type", rename_all = "lowercase")]
+#[serde(tag = "type", rename_all = "snake_case")]
 enum ActionRequest {
     Status(StatusRequest),
     Announcement(AnnouncementRequest),
@@ -242,14 +242,32 @@ struct StatusRequest {
     note: Note,
 }
 #[derive(Deserialize)]
-struct AnnouncementRequest {
-    user: UserName,
-    note: Note,
-    aid: Option<u64>,
-    method: AnnouncementMethod,
-    from: Time,
-    to: Time,
-    public: bool,
+#[serde(tag = "method", rename_all = "snake_case")]
+enum AnnouncementRequest {
+    New {
+        user: UserName,
+        note: Note,
+        from: Time,
+        to: Time,
+        public: bool,
+    },
+    Mod {
+        aid: u64,
+        user: UserName,
+        note: Note,
+        from: Time,
+        to: Time,
+        public: bool,
+    },
+    Del {
+        aid: u64,
+        user: UserName,
+    },
+    //FIXME: validate from <= to
+    //FIXME: for method=new: validate now <= from
+    //FIXME: for method=mod: validate:
+    //  last action with same aid was method=new|mod and
+    //  (now <= from or is unchanged if in the past)
 }
 #[derive(Deserialize)]
 struct PresenceRequest {
@@ -424,21 +442,65 @@ impl DbStored for AnnouncementRequest {
         transaction: &rusqlite::Transaction<'_>,
         mqtt: Option<&SyncSender<TypedAction>>,
     ) -> Option<u64> {
+        use AnnouncementRequest::*;
+
         let now = Utc::now().timestamp();
-        AnnouncementAction {
-            action: BaseAction {
-                id: None,
-                note: self.note.0.clone(),
-                time: now,
+        let mut action = match self {
+            New {
+                note,
+                from,
+                to,
+                user,
+                public,
+            } => AnnouncementAction {
+                action: BaseAction {
+                    id: None,
+                    note: note.0.clone(),
+                    time: now,
+                },
+                aid: None,
+                method: AnnouncementMethod::New,
+                from: from.absolute(now),
+                to: to.absolute(now),
+                user: user.0.clone(),
+                public: *public,
             },
-            aid: self.aid,
-            method: self.method,
-            from: self.from.absolute(now),
-            to: self.to.absolute(now),
-            user: self.user.0.clone(),
-            public: self.public,
-        }
-        .store(transaction, mqtt)
+            Mod {
+                aid,
+                note,
+                from,
+                to,
+                user,
+                public,
+            } => AnnouncementAction {
+                action: BaseAction {
+                    id: None,
+                    note: note.0.clone(),
+                    time: now,
+                },
+                aid: Some(*aid),
+                method: AnnouncementMethod::Mod,
+                from: from.absolute(now),
+                to: to.absolute(now),
+                user: user.0.clone(),
+                public: *public,
+            },
+            Del { aid, user } => AnnouncementAction {
+                // Most of the fields will just be ignored when stored.
+                action: BaseAction {
+                    id: None,
+                    note: String::from(""),
+                    time: now,
+                },
+                aid: Some(*aid),
+                method: AnnouncementMethod::Del,
+                from: 0,
+                to: 0,
+                user: user.0.clone(),
+                public: false,
+            },
+        };
+        action.store(transaction, mqtt)
     }
 }
 
