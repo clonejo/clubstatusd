@@ -4,7 +4,6 @@ use std::thread;
 use std::time::Duration;
 
 use rumqtt::{MqttClient, MqttOptions, QoS, ReconnectOptions};
-use rustc_serialize::json::ToJson;
 
 use crate::db::{status, DbCon};
 use crate::model::*;
@@ -31,7 +30,7 @@ fn publish_status(action: &StatusAction, mqtt_client: &mut MqttClient, topic_pre
                 format!("{}status/last", topic_prefix).as_str(),
                 QoS::AtLeastOnce,
                 true,
-                action.to_json().to_string(),
+                serde_json::to_string(action).unwrap().as_bytes(),
             )
             .unwrap();
     }
@@ -47,7 +46,7 @@ fn publish_announcement(
             format!("{}announcement/{}", topic_prefix, action.aid.unwrap()).as_str(),
             QoS::AtLeastOnce,
             false,
-            action.to_json().to_string(),
+            serde_json::to_string(action).unwrap().as_bytes(),
         )
         .unwrap();
 }
