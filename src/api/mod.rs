@@ -635,6 +635,9 @@ struct RestResponder<J: Serialize> {
     response: J,
 }
 impl<J: Serialize> RestResponder<J> {
+    // TODO: either take the Authenticated guard (with reference to request) or a new
+    // Unauthenticated guard (also with reference to request) as paramater, to avoid mistakes with
+    // `auth_required`.
     fn new(auth_required: AuthRequired, status: http::Status, response: J) -> Self {
         RestResponder {
             auth_required,
