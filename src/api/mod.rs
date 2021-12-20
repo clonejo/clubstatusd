@@ -955,3 +955,21 @@ impl ToPublic for AnnouncementAction {
         }
     }
 }
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    use crate::hex_str_to_salt;
+
+    #[test]
+    /// Make sure we do not inadvertantly log people out by changing the cookie generation
+    /// algorithm.
+    fn test_cookie_stable() {
+        let salt =
+            hex_str_to_salt("00112233445566778899aabbccddeeff00112233445566778899aabbccddeeff");
+        assert_eq!(
+            generate_cookie(&salt, "foo"),
+            "600d731a45dd45bc98b002a2989442c41e73898017f7d4d5ba87d1942fbd3e60"
+        );
+    }
+}
