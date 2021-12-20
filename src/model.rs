@@ -1,5 +1,4 @@
 use chrono::Utc;
-use regex::Regex;
 use rocket::request::FromParam;
 use rocket::serde::{Deserialize, Serialize};
 use rustc_serialize::json::{Json, Object, ToJson};
@@ -14,10 +13,6 @@ pub struct BaseAction {
 }
 
 impl BaseAction {
-    fn new(note: String) -> BaseAction {
-        Self::new_with_time(note, Utc::now().timestamp())
-    }
-
     fn new_with_time(note: String, time: i64) -> BaseAction {
         BaseAction {
             id: None,
@@ -71,30 +66,6 @@ pub enum Status {
     Closed,
 }
 
-impl Status {
-    fn from_str(s: &str) -> Option<Status> {
-        match s {
-            "public" => Some(Status::Public),
-            "private" => Some(Status::Private),
-            "closed" => Some(Status::Closed),
-            _ => None,
-        }
-    }
-}
-
-impl ToJson for Status {
-    fn to_json(&self) -> Json {
-        Json::String(
-            match self {
-                Status::Public => "public",
-                Status::Private => "private",
-                Status::Closed => "closed",
-            }
-            .into(),
-        )
-    }
-}
-
 impl StatusAction {
     pub fn new(note: String, time: i64, user: String, status: Status) -> Self {
         StatusAction {
@@ -102,16 +73,6 @@ impl StatusAction {
             user,
             status,
         }
-    }
-}
-
-impl ToJson for StatusAction {
-    fn to_json(&self) -> Json {
-        let mut obj = self.action.to_json_obj();
-        obj.insert("type".into(), "status".to_json());
-        obj.insert("user".into(), self.user.to_json());
-        obj.insert("status".into(), self.status.to_json());
-        Json::Object(obj)
     }
 }
 
@@ -225,7 +186,7 @@ impl ToJson for PresenceAction {
     }
 }
 
-pub trait Action: DbStored + ToJson {
+pub trait Action: DbStored {
     fn get_base_action(&self) -> &BaseAction;
 }
 impl Action for StatusAction {
@@ -250,173 +211,4 @@ pub enum TypedAction {
     Status(StatusAction),
     Announcement(AnnouncementAction),
     Presence(PresenceAction),
-}
-
-impl ToJson for Box<dyn Action> {
-    fn to_json(&self) -> Json {
-        (**self).to_json()
-    }
-}
-
-fn get_checked_user(obj: &Object) -> Result<String, String> {
-    let user = obj.get("user").unwrap().as_string().unwrap().trim();
-    if user.is_empty() || user.len() > 15 {
-        return Err("Bad username, unicode chars, 1 to 15 bytes\n".into());
-    }
-    Ok(String::from(user))
-}
-
-fn get_method(obj: &Object) -> Result<AnnouncementMethod, String> {
-    match obj.get("method").unwrap().as_string().unwrap() {
-        "new" => Ok(AnnouncementMethod::New),
-        "mod" => Ok(AnnouncementMethod::Mod),
-        "del" => Ok(AnnouncementMethod::Del),
-        _ => Err("bad method".into()),
-    }
-}
-
-fn get_from_to(obj: &Object, now: i64) -> Result<(i64, i64), String> {
-    let from = parse_time(obj.get("from").unwrap(), now)?;
-    let to = parse_time(obj.get("to").unwrap(), now)?;
-    if from > to {
-        return Err("from must be <= to".into());
-    }
-    Ok((from, to))
-}
-
-pub fn parse_time(json: &Json, now: i64) -> Result<i64, String> {
-    match *json {
-        Json::I64(t) => Ok(t),
-        Json::U64(t) => Ok(t as i64),
-        Json::String(ref s) => parse_time_string(s, now),
-        _ => Err("bad time specification (wrong type)".into()),
-    }
-}
-
-fn parse_u64_string(s: &str) -> Result<u64, String> {
-    s.parse::<u64>().map_err(|_| "bad integer".into())
-}
-
-pub fn parse_time_string(s: &str, now: i64) -> Result<i64, String> {
-    match s.parse::<i64>() {
-        Ok(i) => Ok(i),
-        Err(_) => {
-            if s == "now" {
-                return Ok(now);
-            }
-            let re = Regex::new(r"^now([+-])(\d+)$").unwrap();
-            match re.captures(s) {
-                None => Err("bad time specification".into()),
-                Some(captures) => {
-                    let mut i: i64 = parse_u64_string(captures.get(2).unwrap().as_str())? as i64;
-                    match captures.get(1).unwrap().as_str() {
-                        "+" => {}
-                        "-" => {
-                            i = -i;
-                        }
-                        _ => {
-                            panic!("should be impossible");
-                        }
-                    }
-                    Ok(now + i)
-                }
-            }
-        }
-    }
-}
-
-fn get_public(obj: &Object) -> Result<bool, String> {
-    match obj.get("public") {
-        None => Ok(false),
-        Some(v) => match v.as_boolean() {
-            Some(b) => Ok(b),
-            None => Err("bad value for 'public'".into()),
-        },
-    }
-}
-
-pub enum RequestObject {
-    Action(Box<dyn Action>),
-    PresenceRequest(String),
-}
-
-/*
- * also checks validity of entered values
- */
-pub fn json_to_object(json: Json, now: i64) -> Result<RequestObject, String> {
-    let obj = json.as_object().unwrap();
-    let note = match obj.get("note") {
-        Some(j) => {
-            let note = j.as_string().unwrap();
-            if note.len() > 80 {
-                return Err("Bad note, unicode chars, maximum 80 bytes\n".into());
-            }
-            String::from(note)
-        }
-        None => "".into(),
-    };
-    let base_action = BaseAction::new(note);
-    match obj.get("type").unwrap().as_string().unwrap() {
-        "status" => {
-            let user = get_checked_user(obj)?;
-            Ok(RequestObject::Action(Box::new(StatusAction {
-                action: base_action,
-                user,
-                status: Status::from_str(obj.get("status").unwrap().as_string().unwrap()).unwrap(),
-            })))
-        }
-        "announcement" => {
-            let user = get_checked_user(obj)?;
-            let method = get_method(obj)?;
-            match method {
-                AnnouncementMethod::New => {
-                    let (from, to) = get_from_to(obj, now)?;
-                    if from < now {
-                        return Err("from must be >= now".into());
-                    }
-                    let public = get_public(obj)?;
-                    Ok(RequestObject::Action(Box::new(AnnouncementAction {
-                        action: base_action,
-                        user,
-                        method,
-                        aid: None,
-                        from,
-                        to,
-                        public,
-                    })))
-                }
-                AnnouncementMethod::Mod => {
-                    let aid = obj.get("aid").unwrap().as_u64().unwrap();
-                    let (from, to) = get_from_to(obj, now).unwrap();
-                    let public = get_public(obj)?;
-                    Ok(RequestObject::Action(Box::new(AnnouncementAction {
-                        action: base_action,
-                        user,
-                        method,
-                        aid: Some(aid),
-                        from,
-                        to,
-                        public,
-                    })))
-                }
-                AnnouncementMethod::Del => {
-                    let aid = obj.get("aid").unwrap().as_u64().unwrap();
-                    Ok(RequestObject::Action(Box::new(AnnouncementAction {
-                        action: base_action,
-                        user,
-                        method,
-                        aid: Some(aid),
-                        from: 0,       // overwritten by DbStored::store()
-                        to: 0,         // overwritten by DbStored::store()
-                        public: false, // overwritten by DbStored::store()
-                    })))
-                }
-            }
-        }
-        "presence" => {
-            let user = get_checked_user(obj)?;
-            Ok(RequestObject::PresenceRequest(user))
-        }
-        _ => Err("Unknown action type\n".into()),
-    }
 }
