@@ -150,11 +150,11 @@ fn set_auth_cookie(cookie_jar: &CookieJar, cookie: &str) {
     // cookie expires in 1 to 2 years
     let expiration_year = Utc::today().year() + 2;
     let expire_time = Utc.ymd(expiration_year, 1, 1).and_hms(0, 0, 0);
-    let cookie = Cookie::parse(format!(
-        "clubstatusd-password={}; Path=/; Expires={}",
-        cookie, expire_time
-    ))
-    .unwrap();
+    let cookie = Cookie::build("clubstatusd-password", cookie.to_string())
+        .path("/")
+        //.expires(&expire_time)
+        .max_age(time::Duration::weeks(53))
+        .finish();
     cookie_jar.add(cookie);
 }
 
