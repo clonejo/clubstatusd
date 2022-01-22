@@ -422,7 +422,7 @@ impl DbStored for PresenceAction {
         }
         tx.execute(
             "INSERT INTO presence_anon_action (id, anonymous_users) VALUES (?, ?)",
-            &[&(action_id as i64), &(self.anonymous_users as i64)],
+            &[&(action_id as i64), &(self.anonymous_users as f64)],
         )
         .unwrap();
         self.action.id = Some(action_id);
