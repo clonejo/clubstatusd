@@ -68,7 +68,7 @@ fn publish_presence<'a>(action: &'a PresenceAction, client: &mut MqttClient, top
         "{:.1} anonyme hackende",
         action.anonymous_users
     )));
-    let users_string: String = users.join(",");
+    let users_string: String = users.join(", ");
     client
         .publish(
             format!("{}presence/list", topic_prefix).as_str(),
