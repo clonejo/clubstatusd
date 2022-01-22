@@ -1,3 +1,4 @@
+use std::borrow::Cow;
 use std::sync::mpsc::{sync_channel, SyncSender, TryRecvError};
 use std::sync::{Arc, Mutex};
 use std::thread;
@@ -52,13 +53,21 @@ fn publish_announcement(
 }
 
 fn publish_presence<'a>(action: &'a PresenceAction, client: &mut MqttClient, topic_prefix: &str) {
-    let mut users: Vec<&'a str> = action
+    let mut users: Vec<Cow<str>> = action
         .users
         .iter()
-        .filter(|u: &&PresentUser| -> bool { u.status != PresentUserStatus::Left })
-        .map(|u: &'a PresentUser| -> &'a str { &*u.name })
+        .filter_map(|u: &PresentNamedUser| {
+            if u.status == PresentUserStatus::Left {
+                return None;
+            }
+            Some(Cow::from(u.user.as_str()))
+        })
         .collect();
     users.sort_unstable();
+    users.push(Cow::from(format!(
+        "{:.1} anonyme hackende",
+        action.anonymous_users
+    )));
     let users_string: String = users.join(",");
     client
         .publish(
@@ -74,15 +83,24 @@ fn publish_presence<'a>(action: &'a PresenceAction, client: &mut MqttClient, top
             PresentUserStatus::Present => "present",
             PresentUserStatus::Left => "left",
         };
+        let name = user.user.as_str();
         client
             .publish(
-                format!("{}presence/{}/{}", topic_prefix, status_str, user.name).as_str(),
+                format!("{}presence/{}/{}", topic_prefix, status_str, name).as_str(),
                 QoS::ExactlyOnce,
                 false,
                 user.since.to_string(),
             )
             .unwrap();
     }
+    client
+        .publish(
+            format!("{}presence/present-anonymous", topic_prefix,).as_str(),
+            QoS::ExactlyOnce,
+            false,
+            format!("{:.1}", action.anonymous_users),
+        )
+        .unwrap();
 }
 
 pub fn start_handler(

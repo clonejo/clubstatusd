@@ -31,6 +31,7 @@ use crate::db::DbStored;
 use crate::model::Status;
 use crate::model::{
     AnnouncementAction, AnnouncementMethod, BaseAction, QueryActionType, StatusAction, TypedAction,
+    UserName,
 };
 use crate::util::bytes_to_hex;
 
@@ -111,7 +112,7 @@ impl<'r> FromRequest<'r> for Authenticated {
         if let Some(cookie) = cookie_jar.get("clubstatusd-password") {
             if cookie.value() == auth_secrets.cookie {
                 // set cookie again to extend lifetime
-                set_auth_cookie(&cookie_jar, auth_secrets.cookie.as_str());
+                set_auth_cookie(cookie_jar, auth_secrets.cookie.as_str());
                 return request::Outcome::Success(Authenticated {});
             }
         }
@@ -121,10 +122,10 @@ impl<'r> FromRequest<'r> for Authenticated {
             _ => "",
         };
         if basic_auth_password == auth_secrets.password {
-            set_auth_cookie(&cookie_jar, auth_secrets.cookie.as_str());
+            set_auth_cookie(cookie_jar, auth_secrets.cookie.as_str());
             return request::Outcome::Success(Authenticated {});
         } else {
-            clear_auth_cookie(&cookie_jar);
+            clear_auth_cookie(cookie_jar);
             return request::Outcome::Failure((
                 http::Status::Unauthorized,
                 "Auth check failed. Please perform HTTP basic auth with the correct password.",
@@ -185,7 +186,7 @@ struct ApiVersions {
 }
 
 #[get("/api/versions")]
-fn api_versions<'a>() -> RestResponder<ApiVersions> {
+fn api_versions() -> RestResponder<ApiVersions> {
     RestResponder::new(
         AuthRequired::Public,
         http::Status::Ok,
@@ -264,39 +265,34 @@ enum AnnouncementRequest {
     //  last action with same aid was method=new|mod and
     //  (now <= from or is unchanged if in the past)
 }
-#[derive(Deserialize)]
-struct PresenceRequest {
-    user: UserName,
+#[derive(PartialEq, Debug, Clone, Deserialize, Serialize)]
+#[serde(untagged)]
+pub enum PresenceRequest {
+    NamedUser {
+        user: UserName,
+    },
+    AnonymousUsers {
+        anonymous_client_id: u64,
+        anonymous_users: f32,
+    },
 }
-struct UserName(String);
-impl<'de> Deserialize<'de> for UserName {
-    fn deserialize<D>(deserializer: D) -> Result<UserName, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        deserializer.deserialize_str(UserNameVisitor)
-    }
-}
-struct UserNameVisitor;
-impl<'de> Visitor<'de> for UserNameVisitor {
-    type Value = UserName;
-
-    fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-        formatter.write_str("Usernames must be UTF-8 encoded, and 1-15 bytes.")
-    }
-
-    fn visit_str<E>(self, value: &str) -> Result<Self::Value, E>
-    where
-        E: de::Error,
-    {
-        let user = String::from(value);
-        if user.len() == 0 || user.len() > 15 {
-            return Err(E::custom(format!(
-                "Username '{}' is either empty or longer than 15 bytes.",
-                user
-            )));
-        }
-        Ok(UserName(user))
+impl PartialOrd for PresenceRequest {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        let s = match self {
+            PresenceRequest::NamedUser { user } => (0, user.as_str(), 0),
+            PresenceRequest::AnonymousUsers {
+                anonymous_client_id,
+                ..
+            } => (1, "", *anonymous_client_id),
+        };
+        let o = match other {
+            PresenceRequest::NamedUser { user } => (0, user.as_str(), 0),
+            PresenceRequest::AnonymousUsers {
+                anonymous_client_id,
+                ..
+            } => (1, "", *anonymous_client_id),
+        };
+        s.partial_cmp(&o)
     }
 }
 #[derive(Debug, PartialEq)]
@@ -427,7 +423,7 @@ impl DbStored for StatusRequest {
                 time: Utc::now().timestamp(),
             },
             status: self.status,
-            user: self.user.0.clone(),
+            user: self.user.clone(),
         }
         .store(transaction, mqtt)
     }
@@ -458,7 +454,7 @@ impl DbStored for AnnouncementRequest {
                 method: AnnouncementMethod::New,
                 from: from.absolute(now),
                 to: to.absolute(now),
-                user: user.0.clone(),
+                user: user.clone(),
                 public: *public,
             },
             Mod {
@@ -478,7 +474,7 @@ impl DbStored for AnnouncementRequest {
                 method: AnnouncementMethod::Mod,
                 from: from.absolute(now),
                 to: to.absolute(now),
-                user: user.0.clone(),
+                user: user.clone(),
                 public: *public,
             },
             Del { aid, user } => AnnouncementAction {
@@ -492,7 +488,7 @@ impl DbStored for AnnouncementRequest {
                 method: AnnouncementMethod::Del,
                 from: 0,
                 to: 0,
-                user: user.0.clone(),
+                user: user.clone(),
                 public: false,
             },
         };
@@ -513,7 +509,7 @@ enum CreateActionResponse {
 fn create_action(
     _authenticated: Authenticated,
     shared_con: &State<Arc<Mutex<DbCon>>>,
-    presence_tracker: &State<SyncSender<String>>,
+    presence_tracker: &State<SyncSender<PresenceRequest>>,
     mqtt: &State<Option<SyncSender<TypedAction>>>,
     action_request: Result<ActionRequest, ActionRequestError>,
 ) -> Result<RestResponder<CreateActionResponse>, JsonErrorResponder> {
@@ -569,8 +565,8 @@ fn create_action(
                 )),
             }
         }
-        ActionRequest::Presence(PresenceRequest { user: username }) => {
-            presence_tracker.send(username.0).unwrap();
+        ActionRequest::Presence(presence_request) => {
+            presence_tracker.send(presence_request).unwrap();
             Ok(RestResponder::new(
                 AuthRequired::Required,
                 http::Status::Ok,

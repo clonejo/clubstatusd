@@ -86,19 +86,28 @@ fn create_tables(tx: &Transaction) {
         &[],
     )
     .unwrap();
+
+    tx.execute(
+        "CREATE TABLE presence_anon_action (
+                 id INTEGER,
+                 anonymous_users FLOAT
+             )",
+        &[],
+    )
+    .unwrap();
 }
 
 fn insert_initial_status(tx: &Transaction) {
     let mut status_action = StatusAction::new(
         "initial state".into(),
         0,
-        "Hans Acker".into(),
+        UserName::new("Hans Acker".into()),
         Status::Closed,
     );
     status_action.store(tx, None).unwrap();
 }
 
 fn insert_initial_presence(tx: &Transaction) {
-    let mut presence_action = PresenceAction::new_with_time("initial state".into(), 0, vec![]);
+    let mut presence_action = PresenceAction::new_with_time("initial state".into(), 0, vec![], 0.0);
     presence_action.store(tx, None).unwrap();
 }
