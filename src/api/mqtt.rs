@@ -101,6 +101,14 @@ fn publish_presence<'a>(action: &'a PresenceAction, client: &mut MqttClient, top
             format!("{:.1}", action.anonymous_users),
         )
         .unwrap();
+    client
+        .publish(
+            format!("{}presence/total", topic_prefix,).as_str(),
+            QoS::ExactlyOnce,
+            true,
+            format!("{:.1}", action.anonymous_users + action.users.len() as f32),
+        )
+        .unwrap();
 }
 
 pub fn start_handler(
