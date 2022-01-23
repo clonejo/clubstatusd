@@ -631,16 +631,14 @@ pub mod presence {
                         anonymous_client_id,
                         anonymous_users,
                     }) => {
-                        let presence = anonymous_presence
-                            .entry(anonymous_client_id)
-                            .or_insert_with(|| {
-                                changed = true;
-                                AnonymousPresence {
-                                    anonymous_users,
-                                    last_seen: now,
-                                }
-                            });
-                        presence.last_seen = now;
+                        anonymous_presence.insert(
+                            anonymous_client_id,
+                            AnonymousPresence {
+                                anonymous_users,
+                                last_seen: now,
+                            },
+                        );
+                        changed = true;
                     }
                     Err(TryRecvError::Empty) => {
                         break;
