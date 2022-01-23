@@ -60,7 +60,7 @@ fn publish_presence<'a>(action: &'a PresenceAction, client: &mut MqttClient, top
             if u.status == PresentUserStatus::Left {
                 return None;
             }
-            Some(Cow::from(u.user.as_str()))
+            Some(Cow::from(u.name.as_str()))
         })
         .collect();
     users.sort_unstable();
@@ -83,7 +83,7 @@ fn publish_presence<'a>(action: &'a PresenceAction, client: &mut MqttClient, top
             PresentUserStatus::Present => "present",
             PresentUserStatus::Left => "left",
         };
-        let name = user.user.as_str();
+        let name = user.name.as_str();
         client
             .publish(
                 format!("{}presence/{}/{}", topic_prefix, status_str, name).as_str(),

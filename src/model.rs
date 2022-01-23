@@ -120,7 +120,7 @@ impl PresenceAction {
 
 #[derive(Clone, Debug, Serialize)]
 pub struct PresentNamedUser {
-    pub user: UserName,
+    pub name: UserName,
     pub since: i64,
     pub status: PresentUserStatus,
 }

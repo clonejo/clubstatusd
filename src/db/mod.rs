@@ -413,7 +413,7 @@ impl DbStored for PresenceAction {
                 PresentUserStatus::Joined | PresentUserStatus::Present => {
                     tx.execute(
                         "INSERT INTO presence_action (id, user, since) VALUES (?, ?, ?)",
-                        &[&(action_id as i64), &user.user.as_str(), &user.since],
+                        &[&(action_id as i64), &user.name.as_str(), &user.since],
                     )
                     .unwrap();
                 }
@@ -458,13 +458,13 @@ pub mod presence {
             .unwrap();
         let users_iter = stmt
             .query_map(&[&(action.id.unwrap() as i64)], |row| PresentNamedUser {
-                user: UserName::new(row.get(0)),
+                name: UserName::new(row.get(0)),
                 since: row.get(1),
                 status: PresentUserStatus::Present,
             })
             .unwrap();
         let mut users: Vec<PresentNamedUser> = users_iter.map(|user| user.unwrap()).collect();
-        users.sort_by_key(|u| u.user.clone()); //FIXME: why do i need this clone()??
+        users.sort_by_key(|u| u.name.clone()); //FIXME: why do i need this clone()??
 
         let anonymous_users = con
             .query_row(
@@ -542,7 +542,7 @@ pub mod presence {
         let mut users: HashMap<UserName, UserPresence> = HashMap::new();
         for user in last_action.users {
             users.insert(
-                user.user,
+                user.name,
                 UserPresence {
                     since: user.since,
                     last_seen: now,
@@ -585,7 +585,7 @@ pub mod presence {
             let mut present_users = Vec::new();
             for (user, presence) in users.iter() {
                 present_users.push(PresentNamedUser {
-                    user: user.clone(),
+                    name: user.clone(),
                     since: presence.since,
                     status: presence.status.clone(),
                 });
