@@ -95,7 +95,7 @@ fn publish_presence<'a>(action: &'a PresenceAction, client: &mut MqttClient, top
     }
     client
         .publish(
-            format!("{}presence/present-anonymous", topic_prefix,).as_str(),
+            format!("{}presence/anonymous", topic_prefix,).as_str(),
             QoS::ExactlyOnce,
             false,
             format!("{:.1}", action.anonymous_users),
