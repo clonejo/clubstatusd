@@ -437,6 +437,7 @@ impl DbStored for PresenceAction {
 pub mod presence {
     use super::*;
     use chrono::Utc;
+    use float_cmp::approx_eq;
     use rusqlite::Row;
     use std::collections::HashMap;
     use std::sync::mpsc::{sync_channel, Receiver, SyncSender, TryRecvError};
@@ -631,14 +632,20 @@ pub mod presence {
                         anonymous_client_id,
                         anonymous_users,
                     }) => {
-                        anonymous_presence.insert(
-                            anonymous_client_id,
-                            AnonymousPresence {
-                                anonymous_users,
-                                last_seen: now,
-                            },
-                        );
-                        changed = true;
+                        let entry = anonymous_presence
+                            .entry(anonymous_client_id)
+                            .or_insert_with(|| {
+                                changed = true;
+                                AnonymousPresence {
+                                    anonymous_users,
+                                    last_seen: now,
+                                }
+                            });
+                        if !approx_eq!(f32, anonymous_users, entry.anonymous_users, ulps = 2) {
+                            changed = true;
+                            entry.anonymous_users = anonymous_users;
+                        }
+                        entry.last_seen = now;
                     }
                     Err(TryRecvError::Empty) => {
                         break;
