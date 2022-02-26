@@ -652,6 +652,7 @@ impl<'r, 'o: 'r, J: Serialize> Responder<'r, 'o> for RestResponder<J> {
         let mut json_str = serde_json::to_string_pretty(&self.response).unwrap();
         json_str.push('\n'); // add trailing newline
         let mut res = Response::build();
+        res.header(ContentType::JSON);
         if self.auth_required == AuthRequired::Public {
             res.header(Header::new("Access-Control-Allow-Origin", "*"));
         }
