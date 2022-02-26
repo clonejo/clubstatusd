@@ -13,8 +13,7 @@ use chrono::{Datelike, TimeZone, Utc};
 use regex::Regex;
 use rocket::data::{self, Data, FromData, ToByteUnit};
 use rocket::form::{self, FromFormField, ValueField};
-use rocket::http::{self, Header};
-use rocket::http::{Cookie, CookieJar};
+use rocket::http::{self, ContentType, Cookie, CookieJar, Header};
 use rocket::request::{self, FromRequest, Request};
 use rocket::response::{Responder, Response};
 use rocket::serde::de::{self, Visitor};
@@ -35,6 +34,7 @@ use crate::model::{
 };
 use crate::util::bytes_to_hex;
 
+mod ics;
 pub mod mqtt;
 
 pub fn run(
@@ -73,6 +73,8 @@ pub fn run(
                 status_current_public,
                 announcement_current,
                 announcement_current_public,
+                ics::announcement_current,
+                ics::announcement_current_public,
             ],
         );
 
@@ -621,7 +623,7 @@ impl Default for AuthRequired {
 }
 
 /**
- * Responder for publicly accessible data, for which no authentication is needed.
+ * Responder for json.
  *
  * Can optionally set header `Access-Control-Allow-Origin: *`.
  */

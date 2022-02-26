@@ -258,6 +258,7 @@ dependencies = [
  "config",
  "cookie",
  "float-cmp",
+ "icalendar",
  "libc",
  "regex",
  "rocket",
@@ -269,6 +270,7 @@ dependencies = [
  "sodiumoxide",
  "spaceapi",
  "time 0.2.27",
+ "uuid 0.8.2",
 ]
 
 [[package]]
@@ -762,6 +764,16 @@ dependencies = [
  "tower-service",
  "tracing",
  "want",
+]
+
+[[package]]
+name = "icalendar"
+version = "0.11.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f6f9539aa862f7864ec1434d031135615c33a1bad8076803f3b5d7ce22563d6a"
+dependencies = [
+ "chrono",
+ "uuid 0.8.2",
 ]
 
 [[package]]
@@ -1698,7 +1710,7 @@ dependencies = [
  "tokio-io",
  "tokio-rustls",
  "tokio-timer",
- "uuid",
+ "uuid 0.7.4",
  "webpki",
 ]
 
@@ -2557,6 +2569,16 @@ checksum = "90dbc611eb48397705a6b0f6e917da23ae517e4d127123d2cf7674206627d32a"
 dependencies = [
  "rand 0.6.5",
  "serde 1.0.132",
+]
+
+[[package]]
+name = "uuid"
+version = "0.8.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "bc5cf98d8186244414c848017f0e2676b3fcb46807f6668a97dfe67359a3c4b7"
+dependencies = [
+ "getrandom",
+ "sha1",
 ]
 
 [[package]]

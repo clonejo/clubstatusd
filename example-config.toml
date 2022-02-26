@@ -44,7 +44,13 @@ spaceapi = """
     "issue_report_channels": [
         "twitter"
     ],
-    "state": {}
+    "state": {},
+    "feeds": {
+        "calendar": {
+            "type": "ical",
+            "url": "http://status.your-space.org/api/v0/announcement/current.ics?public"
+        }
+    }
 }
 """
 
