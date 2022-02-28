@@ -4,12 +4,13 @@ use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::Duration;
 
-use rumqtt::{MqttClient, MqttOptions, QoS, ReconnectOptions};
+use rumqttc::{Client, Event, Incoming, MqttOptions, Outgoing, QoS};
+use uuid::Uuid;
 
 use crate::db::{status, DbCon};
 use crate::model::*;
 
-fn publish_status(action: &StatusAction, mqtt_client: &mut MqttClient, topic_prefix: &str) {
+fn publish_status(action: &StatusAction, mqtt_client: &mut Client, topic_prefix: &str) {
     {
         let payload = match action.status {
             Status::Public => "public",
@@ -37,11 +38,7 @@ fn publish_status(action: &StatusAction, mqtt_client: &mut MqttClient, topic_pre
     }
 }
 
-fn publish_announcement(
-    action: &AnnouncementAction,
-    mqtt_client: &mut MqttClient,
-    topic_prefix: &str,
-) {
+fn publish_announcement(action: &AnnouncementAction, mqtt_client: &mut Client, topic_prefix: &str) {
     mqtt_client
         .publish(
             format!("{}announcement/{}", topic_prefix, action.aid.unwrap()).as_str(),
@@ -52,7 +49,7 @@ fn publish_announcement(
         .unwrap();
 }
 
-fn publish_presence<'a>(action: &'a PresenceAction, client: &mut MqttClient, topic_prefix: &str) {
+fn publish_presence<'a>(action: &'a PresenceAction, client: &mut Client, topic_prefix: &str) {
     let mut users: Vec<Cow<str>> = action
         .users
         .iter()
@@ -124,16 +121,25 @@ pub fn start_handler(
                 .name(String::from("mqtt_client"))
                 .spawn(move || {
                     println!("will connect to mqtt server {}, port {}", server_str, port);
-                    let opts = MqttOptions::new("clubstatusd", server_str, port)
-                        .set_keep_alive(30)
-                        .set_reconnect_opts(ReconnectOptions::AfterFirstSuccess(30));
-                    let (mut mqtt_client, _mqtt_receiver) = match MqttClient::start(opts) {
-                        Ok(r) => r,
-                        Err(e) => {
-                            eprintln!("could not connect to mqtt server: {}", e);
-                            std::process::exit(1);
+                    let client_id = format!("clubstatusd-{}", Uuid::new_v4());
+                    let mut opts = MqttOptions::new(client_id, server_str, port);
+                    opts.set_keep_alive(Duration::from_secs(30));
+                    //.set_reconnect_opts(ReconnectOptions::AfterFirstSuccess(30));
+                    let (mut mqtt_client, mut connection) = Client::new(opts, 10);
+                    thread::spawn(move || {
+                        for notification in connection.iter() {
+                            match notification {
+                                Ok(
+                                    Event::Outgoing(Outgoing::PingReq)
+                                    | Event::Incoming(Incoming::PingResp),
+                                ) => { /* do not log ping messages */ }
+                                _ => {
+                                    println!("MQTT notification: {notification:?}");
+                                }
+                            }
                         }
-                    };
+                        panic!("MQTT client broke!");
+                    });
 
                     let last_status = {
                         let con = shared_con.lock().unwrap();
@@ -168,7 +174,7 @@ pub fn start_handler(
                                 }
                             }
                         }
-                        thread::sleep(Duration::new(2, 0));
+                        thread::sleep(Duration::from_secs(2));
                     }
                 })
                 .unwrap();
