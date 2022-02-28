@@ -12,22 +12,22 @@ use std::io::{stderr, Write};
 use std::path::Path;
 use std::sync::{Arc, Mutex};
 
-use clap::{App, Arg};
+use clap::{Arg, Command};
 use config::{Config, ConfigError};
 use sodiumoxide::crypto::pwhash;
 use sodiumoxide::crypto::pwhash::Salt;
 
 #[launch]
 async fn rocket() -> _ {
-    let arg_matches = App::new("clubstatusd")
+    let arg_matches = Command::new("clubstatusd")
         .author("clonejo <clonejo@shakik.de>")
         .about(
             "Backend with HTTP API that keeps your hackerspace's status (open/closed, \
              announcements, presence)",
         )
         .arg(
-            Arg::with_name("CONFIG")
-                .short("c")
+            Arg::new("CONFIG")
+                .short('c')
                 .long("config")
                 .takes_value(true)
                 .help("set config file to use"),
