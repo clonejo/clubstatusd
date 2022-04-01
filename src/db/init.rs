@@ -1,7 +1,7 @@
 use std::fs;
 use std::path::Path;
 
-use rusqlite::{Connection, Error, Transaction};
+use rusqlite::{params, Connection, Error, Transaction};
 
 use crate::db::DbStored;
 use crate::model::*;
@@ -33,7 +33,7 @@ fn create_tables(tx: &Transaction) {
                      type INTEGER NOT NULL,
                      note TEXT NOT NULL
                  )",
-        &[],
+        params![],
     )
     .unwrap();
 
@@ -52,7 +52,7 @@ fn create_tables(tx: &Transaction) {
                  changed INTEGER NOT NULL,
                  public_changed INTEGER NOT NULL
              )",
-        &[],
+        params![],
     )
     .unwrap();
 
@@ -73,7 +73,7 @@ fn create_tables(tx: &Transaction) {
                  'to' INTEGER,
                  public INTEGER
              )",
-        &[],
+        params![],
     )
     .unwrap();
 
@@ -83,7 +83,7 @@ fn create_tables(tx: &Transaction) {
                  user TEXT NOT NULL,
                  since INTEGER
              )",
-        &[],
+        params![],
     )
     .unwrap();
 
@@ -92,7 +92,7 @@ fn create_tables(tx: &Transaction) {
                  id INTEGER,
                  anonymous_users FLOAT
              )",
-        &[],
+        params![],
     )
     .unwrap();
 }

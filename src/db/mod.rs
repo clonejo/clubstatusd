@@ -2,7 +2,7 @@ use std::path::Path;
 use std::sync::mpsc::SyncSender;
 
 use rusqlite::types::{FromSql, FromSqlError, FromSqlResult, ToSql, ToSqlOutput, Value, ValueRef};
-use rusqlite::{Connection, Error, Transaction};
+use rusqlite::{params, Connection, Error, Transaction};
 
 use crate::api::{IdExpr, PresenceRequest, RangeExpr, Take};
 use crate::model::{
@@ -34,7 +34,7 @@ impl DbStoredTyped for BaseAction {
     fn store(&mut self, type_: i64, con: &DbCon) -> Option<u64> {
         con.execute(
             "INSERT INTO action (time, type, note) VALUES (?, ?, ?)",
-            &[&self.time, &type_, &self.note],
+            params![&self.time, &type_, &self.note],
         )
         .unwrap();
         let action_id = con.last_insert_rowid() as u64;
@@ -71,7 +71,7 @@ impl DbStored for StatusAction {
                 tx.execute(
                     "INSERT INTO status_action (id, user, status, changed, public_changed) \
                      VALUES (?, ?, ?, ?, ?)",
-                    &[
+                    params![
                         &(action_id as i64),
                         &self.user,
                         &self.status,
@@ -132,23 +132,23 @@ pub mod status {
     use super::*;
     use rusqlite::{Error, Row};
 
-    fn row_to_status_action(row: &Row) -> StatusAction {
-        StatusAction {
+    fn row_to_status_action(row: &Row) -> Result<StatusAction, Error> {
+        Ok(StatusAction {
             action: BaseAction {
-                id: Some(row.get::<_, i64>(0) as u64),
-                time: row.get(1),
-                note: row.get(3),
+                id: Some(row.get::<_, i64>(0)? as u64),
+                time: row.get(1)?,
+                note: row.get(3)?,
             },
-            user: row.get(5),
-            status: row.get(6),
-        }
+            user: row.get(5)?,
+            status: row.get(6)?,
+        })
     }
 
     pub fn get_by_id(id: u64, con: &DbCon) -> Result<StatusAction, Error> {
         con.query_row(
             "SELECT * FROM action JOIN status_action WHERE \
              action.id = ? AND status_action.id = ?",
-            &[&(id as i64), &(id as i64)],
+            params![&(id as i64), &(id as i64)],
             row_to_status_action,
         )
     }
@@ -158,7 +158,7 @@ pub mod status {
             "SELECT * FROM action JOIN status_action WHERE action.type = 0 AND \
              action.id = status_action.id \
              ORDER BY action.id DESC LIMIT 1",
-            &[],
+            params![],
             row_to_status_action,
         )
     }
@@ -168,7 +168,7 @@ pub mod status {
             "SELECT * FROM action JOIN status_action WHERE action.type = 0 AND \
              action.id = status_action.id AND status_action.changed = 1 \
              ORDER BY action.id DESC LIMIT 1",
-            &[],
+            params![],
             row_to_status_action,
         )
     }
@@ -178,7 +178,7 @@ pub mod status {
             "SELECT * FROM action JOIN status_action WHERE action.type = 0 AND \
              action.id = status_action.id AND status_action.public_changed = 1 \
              ORDER BY action.id DESC LIMIT 1",
-            &[],
+            params![],
             row_to_status_action,
         )
     }
@@ -200,7 +200,7 @@ impl DbStored for AnnouncementAction {
                                 "INSERT INTO announcement_action \
                                  (id, method, aid, user, \"from\", \"to\", public) VALUES \
                                  (?, ?, ?, ?, ?, ?, ?)",
-                                &[
+                                params![
                                     &(action_id as i64),
                                     &0,
                                     &(action_id as i64),
@@ -235,7 +235,7 @@ impl DbStored for AnnouncementAction {
                             };
                             let action_id = DbStoredTyped::store(&mut self.action, 1, tx).unwrap();
                             tx.execute("INSERT INTO announcement_action (id, method, aid, user, 'from', 'to', public) VALUES (?, ?, ?, ?, ?, ?, ?)",
-                                    &[&(action_id as i64), &1, &(aid as i64),
+                                    params![&(action_id as i64), &1, &(aid as i64),
                                       &self.user, &self.from, &self.to, &(self.public as i64)]).unwrap();
                             self.action.id = Some(action_id);
                             println!("Stored new action: {:?}", self);
@@ -263,7 +263,7 @@ impl DbStored for AnnouncementAction {
                             self.public = last_action.public;
                             let action_id = DbStoredTyped::store(&mut self.action, 1, tx).unwrap();
                             tx.execute("INSERT INTO announcement_action (id, method, aid, user, 'from', 'to', public) VALUES (?, ?, ?, ?, ?, ?, ?)",
-                                    &[&(action_id as i64), &2, &(aid as i64),
+                                    params![&(action_id as i64), &2, &(aid as i64),
                                       &self.user, &self.from, &self.to, &(self.public as i64)]).unwrap();
                             self.action.id = Some(action_id);
                             println!("Stored new action: {:?}", self);
@@ -309,31 +309,31 @@ pub mod announcements {
     use chrono::*;
     use rusqlite::{Error, Row};
 
-    fn row_to_announcement_action(row: &Row) -> AnnouncementAction {
-        AnnouncementAction {
+    fn row_to_announcement_action(row: &Row) -> Result<AnnouncementAction, Error> {
+        Ok(AnnouncementAction {
             action: BaseAction {
-                id: Some(row.get::<_, i64>(0) as u64),
-                time: row.get(1),
-                note: row.get(3),
+                id: Some(row.get::<_, i64>(0)? as u64),
+                time: row.get(1)?,
+                note: row.get(3)?,
             },
-            method: row.get(5),
-            aid: Some(row.get::<_, i64>(6) as u64),
-            user: row.get(7),
-            from: row.get(8),
-            to: row.get(9),
-            public: match row.get(10) {
+            method: row.get(5)?,
+            aid: Some(row.get::<_, i64>(6)? as u64),
+            user: row.get(7)?,
+            from: row.get(8)?,
+            to: row.get(9)?,
+            public: match row.get(10)? {
                 0 => false,
                 1 => true,
-                _ => panic!(),
+                unexpected => panic!("unexpected value for public: {unexpected}"),
             },
-        }
+        })
     }
 
     pub fn get_by_id(id: u64, con: &DbCon) -> Result<AnnouncementAction, Error> {
         con.query_row(
             "SELECT * FROM action JOIN announcement_action WHERE action.type = 1 AND \
              action.id = ? AND announcement_action.id = ?",
-            &[&(id as i64), &(id as i64)],
+            params![&(id as i64), &(id as i64)],
             row_to_announcement_action,
         )
     }
@@ -343,7 +343,7 @@ pub mod announcements {
             "SELECT * FROM action JOIN announcement_action WHERE action.type = 1 AND \
              action.id = announcement_action.id AND announcement_action.aid = ? \
              ORDER BY action.id DESC LIMIT 1",
-            &[&(aid as i64)],
+            params![&(aid as i64)],
             row_to_announcement_action,
         );
         match res {
@@ -404,7 +404,7 @@ impl DbStored for PresenceAction {
         }
         tx.execute(
             "INSERT INTO action (time, type, note) VALUES (?, ?, ?)",
-            &[&self.action.time, &2, &self.action.note],
+            params![&self.action.time, &2, &self.action.note],
         )
         .unwrap();
         let action_id = tx.last_insert_rowid() as u64;
@@ -413,7 +413,7 @@ impl DbStored for PresenceAction {
                 PresentUserStatus::Joined | PresentUserStatus::Present => {
                     tx.execute(
                         "INSERT INTO presence_action (id, user, since) VALUES (?, ?, ?)",
-                        &[&(action_id as i64), &user.name.as_str(), &user.since],
+                        params![&(action_id as i64), &user.name.as_str(), &user.since],
                     )
                     .unwrap();
                 }
@@ -422,7 +422,7 @@ impl DbStored for PresenceAction {
         }
         tx.execute(
             "INSERT INTO presence_anon_action (id, anonymous_users) VALUES (?, ?)",
-            &[&(action_id as i64), &(self.anonymous_users as f64)],
+            params![&(action_id as i64), &(self.anonymous_users as f64)],
         )
         .unwrap();
         self.action.id = Some(action_id);
@@ -445,12 +445,12 @@ pub mod presence {
     use std::thread;
     use std::time::Duration;
 
-    fn row_to_base_action(row: &Row) -> BaseAction {
-        BaseAction {
-            id: Some(row.get::<_, i64>(0) as u64),
-            time: row.get(1),
-            note: row.get(3),
-        }
+    fn row_to_base_action(row: &Row) -> Result<BaseAction, Error> {
+        Ok(BaseAction {
+            id: Some(row.get::<_, i64>(0)? as u64),
+            time: row.get(1)?,
+            note: row.get(3)?,
+        })
     }
 
     fn get_by_base_action(action: BaseAction, con: &DbCon) -> Result<PresenceAction, Error> {
@@ -458,10 +458,12 @@ pub mod presence {
             .prepare("SELECT user, since FROM presence_action WHERE id = ?")
             .unwrap();
         let users_iter = stmt
-            .query_map(&[&(action.id.unwrap() as i64)], |row| PresentNamedUser {
-                name: UserName::new(row.get(0)),
-                since: row.get(1),
-                status: PresentUserStatus::Present,
+            .query_map(&[&(action.id.unwrap() as i64)], |row| {
+                Ok(PresentNamedUser {
+                    name: UserName::new(row.get(0)?),
+                    since: row.get(1)?,
+                    status: PresentUserStatus::Present,
+                })
             })
             .unwrap();
         let mut users: Vec<PresentNamedUser> = users_iter.map(|user| user.unwrap()).collect();
@@ -485,7 +487,7 @@ pub mod presence {
     pub fn get_by_id(id: u64, con: &DbCon) -> Result<PresenceAction, Error> {
         let action_res = con.query_row(
             "SELECT * FROM action WHERE id = ? AND type = 2",
-            &[&(id as i64)],
+            params![&(id as i64)],
             row_to_base_action,
         );
         match action_res {
@@ -497,7 +499,7 @@ pub mod presence {
     pub fn get_last(con: &DbCon) -> Result<PresenceAction, Error> {
         let action_res = con.query_row(
             "SELECT * FROM action WHERE type = 2 ORDER BY id DESC LIMIT 1",
-            &[],
+            params![],
             row_to_base_action,
         );
         match action_res {
@@ -675,7 +677,7 @@ pub fn query(
     let time1;
     let time2;
     let count = count as i64;
-    let type_int;
+    let type_int: u8;
 
     let mut params = Vec::<&dyn ToSql>::new();
 
@@ -740,18 +742,21 @@ pub fn query(
 
     let mut stmt = con.prepare(&query_str[..]).unwrap();
     let actions_iter = stmt
-        .query_map(&*params, |row| -> TypedAction {
+        .query_map(&*params, |row| -> Result<TypedAction, Error> {
             // FIXME: this looks very inefficient, are we doing a query _per returned action_!?
-            match row.get(1) {
-                0 => TypedAction::Status(
-                    status::get_by_id(row.get::<_, i64>(0) as u64, con).unwrap(),
-                ),
-                1 => TypedAction::Announcement(
-                    announcements::get_by_id(row.get::<_, i64>(0) as u64, con).unwrap(),
-                ),
-                2 => TypedAction::Presence(
-                    presence::get_by_id(row.get::<_, i64>(0) as u64, con).unwrap(),
-                ),
+            match row.get(1)? {
+                0 => Ok(TypedAction::Status(status::get_by_id(
+                    row.get::<_, i64>(0)? as u64,
+                    con,
+                )?)),
+                1 => Ok(TypedAction::Announcement(announcements::get_by_id(
+                    row.get::<_, i64>(0)? as u64,
+                    con,
+                )?)),
+                2 => Ok(TypedAction::Presence(presence::get_by_id(
+                    row.get::<_, i64>(0)? as u64,
+                    con,
+                )?)),
                 id => panic!("unknown action type in db: {}", id),
             }
         })
