@@ -181,7 +181,6 @@ dependencies = [
  "cookie",
  "float-cmp",
  "icalendar",
- "libc",
  "regex",
  "rocket",
  "rocket-basicauth",
