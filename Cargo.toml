@@ -3,7 +3,7 @@ name = "clubstatusd"
 description = """
 An HTTP API which allows the folks in your hackerspace to track it's status, with privacy enabled. Features: ternary status (public, private, closed), announcements (who's coming, talks, etc), presence (who's in the space), restricted public API
 """
-version = "0.4.0"
+version = "0.4.1"
 authors = ["clonejo <clonejo@shakik.de>"]
 license = "Apache-2.0"
 edition = "2021"

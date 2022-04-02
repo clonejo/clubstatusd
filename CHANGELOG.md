@@ -5,6 +5,21 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+
+## v0.4.1 - 2022-04-02
+### Added
+- Expose announcements as iCalendar events
+- Allow tracking an amount of anonymous present users.
+
+### Changed
+- Switched from hyper to rocket
+- MQTT: Join names in presence/list with ', ' instead of ','
+
+### Fixed
+- Finally upgrade rusqlite to a recent version. Hopefully no more crashing on
+  optimized builds.
+
+## v0.4.0 - 2019-08-28
 ### Changed
 - Now using [spaceapi-rs](https://github.com/spaceapi-community/spaceapi-rs)
   for generating [SpaceAPI](https://spaceapi.io/) output. Because of that, the
