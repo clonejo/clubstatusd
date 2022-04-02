@@ -9,8 +9,8 @@ job:
     - uname -a
     - DEBIAN_FRONTEND=noninteractive apt-get update -y
     - DEBIAN_FRONTEND=noninteractive apt-get install -y gcc openssl libssl-dev sqlite3 libsqlite3-dev pkg-config libsodium-dev libsodium23
-    - RUST_BACKTRACE=1 cargo test --profile=dev
-    - cargo build --profile=dev  # our old version of rusqlite segfaults with release builds
+    - RUST_BACKTRACE=1 cargo test
+    - cargo build --release
   artifacts:
     paths:
-      - target/debug/clubstatusd
+      - target/release/clubstatusd
