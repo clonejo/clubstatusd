@@ -18,6 +18,7 @@ use rocket::request::{self, FromRequest, Request};
 use rocket::response::{Responder, Response};
 use rocket::serde::de::{self, Visitor};
 use rocket::serde::{Deserialize, Deserializer, Serialize};
+use rocket::time::Duration;
 use rocket::{Build, Config, Rocket, State};
 use rocket_basicauth::BasicAuth;
 use sodiumoxide::crypto::pwhash;
@@ -156,7 +157,7 @@ fn set_auth_cookie(cookie_jar: &CookieJar, cookie: &str) {
     let cookie = Cookie::build("clubstatusd-password", cookie.to_string())
         .path("/")
         //.expires(&expire_time)
-        .max_age(time::Duration::weeks(53))
+        .max_age(Duration::weeks(53))
         .finish();
     cookie_jar.add(cookie);
 }
