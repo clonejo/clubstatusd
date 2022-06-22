@@ -10,7 +10,12 @@ use uuid::Uuid;
 use crate::db::{status, DbCon};
 use crate::model::*;
 
-fn publish_status(action: &StatusAction, mqtt_client: &mut Client, topic_prefix: &str) {
+fn publish_status(
+    action: &StatusAction,
+    typed_action: &TypedAction,
+    mqtt_client: &mut Client,
+    topic_prefix: &str,
+) {
     {
         let payload = match action.status {
             Status::Public => "public",
@@ -32,19 +37,26 @@ fn publish_status(action: &StatusAction, mqtt_client: &mut Client, topic_prefix:
                 format!("{}status/last", topic_prefix).as_str(),
                 QoS::AtLeastOnce,
                 true,
-                serde_json::to_string(action).unwrap().as_bytes(),
+                // sending typed_action, since we also want the 'type' tag:
+                serde_json::to_string(typed_action).unwrap().as_bytes(),
             )
             .unwrap();
     }
 }
 
-fn publish_announcement(action: &AnnouncementAction, mqtt_client: &mut Client, topic_prefix: &str) {
+fn publish_announcement(
+    action: &AnnouncementAction,
+    typed_action: &TypedAction,
+    mqtt_client: &mut Client,
+    topic_prefix: &str,
+) {
     mqtt_client
         .publish(
             format!("{}announcement/{}", topic_prefix, action.aid.unwrap()).as_str(),
             QoS::AtLeastOnce,
             false,
-            serde_json::to_string(action).unwrap().as_bytes(),
+            // sending typed_action, since we also want the 'type' tag:
+            serde_json::to_string(typed_action).unwrap().as_bytes(),
         )
         .unwrap();
 }
@@ -145,24 +157,36 @@ pub fn start_handler(
                         let con = shared_con.lock().unwrap();
                         status::get_last(&*con).unwrap()
                     };
-                    publish_status(&last_status, &mut mqtt_client, &*topic_prefix);
+                    let typed_last_status = &TypedAction::Status(last_status.clone());
+                    publish_status(
+                        &last_status,
+                        &typed_last_status,
+                        &mut mqtt_client,
+                        &*topic_prefix,
+                    );
                     println!("published current status on mqtt");
 
                     loop {
                         loop {
                             match rx.try_recv() {
                                 Ok(msg) => match msg {
-                                    TypedAction::Status(action) => {
-                                        publish_status(&action, &mut mqtt_client, &*topic_prefix);
-                                    }
-                                    TypedAction::Announcement(action) => {
-                                        publish_announcement(
+                                    TypedAction::Status(ref action) => {
+                                        publish_status(
                                             &action,
+                                            &msg,
                                             &mut mqtt_client,
                                             &*topic_prefix,
                                         );
                                     }
-                                    TypedAction::Presence(action) => {
+                                    TypedAction::Announcement(ref action) => {
+                                        publish_announcement(
+                                            &action,
+                                            &msg,
+                                            &mut mqtt_client,
+                                            &*topic_prefix,
+                                        );
+                                    }
+                                    TypedAction::Presence(ref action) => {
                                         publish_presence(&action, &mut mqtt_client, &*topic_prefix);
                                     }
                                 },
