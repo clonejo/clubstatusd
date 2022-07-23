@@ -84,7 +84,7 @@ impl<'r, 'o: 'r> Responder<'r, 'o> for IcsResponder {
         let mut s = self.calendar.to_string();
         s.push('\n'); // add trailing newline
         let mut res = Response::build();
-        res.header(ContentType::Calendar);
+        res.header(ContentType::new("text", "calendar; charset=utf-8"));
         if self.auth_required == AuthRequired::Public {
             res.header(Header::new("Access-Control-Allow-Origin", "*"));
         }

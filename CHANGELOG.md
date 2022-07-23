@@ -7,6 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 ### Fixed
 - Fix regression: "type" field went missing from MQTT actions.
+- Explicit charset for ics endpoint
 
 ## v0.4.1 - 2022-04-02
 ### Added
