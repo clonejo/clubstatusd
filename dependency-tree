@@ -59,7 +59,7 @@ clubstatusd v0.4.1 (/home/clonejo/code/clubstatusd)
 │   │   ├── num-traits v0.1.43
 │   │   │   └── num-traits v0.2.15 (*)
 │   │   ├── regex v1.6.0
-│   │   │   ├── aho-corasick v0.7.18
+│   │   │   ├── aho-corasick v0.7.19
 │   │   │   │   └── memchr v2.5.0
 │   │   │   ├── memchr v2.5.0
 │   │   │   └── regex-syntax v0.6.27
@@ -220,7 +220,7 @@ clubstatusd v0.4.1 (/home/clonejo/code/clubstatusd)
 │   │   │       └── scopeguard v1.1.0
 │   │   │       [build-dependencies]
 │   │   │       └── autocfg v1.1.0
-│   │   ├── tokio v1.17.0
+│   │   ├── tokio v1.21.0
 │   │   │   ├── bytes v1.2.1
 │   │   │   ├── libc v0.2.132
 │   │   │   ├── memchr v2.5.0
@@ -239,19 +239,17 @@ clubstatusd v0.4.1 (/home/clonejo/code/clubstatusd)
 │   │   │       ├── proc-macro2 v1.0.43 (*)
 │   │   │       ├── quote v1.0.21 (*)
 │   │   │       └── syn v1.0.99 (*)
-│   │   └── tokio-util v0.7.2
+│   │   │   [build-dependencies]
+│   │   │   └── autocfg v1.1.0
+│   │   └── tokio-util v0.7.3
 │   │       ├── bytes v1.2.1
 │   │       ├── futures-core v0.3.24
 │   │       ├── futures-sink v0.3.24
 │   │       ├── pin-project-lite v0.2.9
-│   │       ├── tokio v1.17.0 (*)
+│   │       ├── tokio v1.21.0 (*)
 │   │       └── tracing v0.1.36
 │   │           ├── cfg-if v1.0.0
 │   │           ├── pin-project-lite v0.2.9
-│   │           ├── tracing-attributes v0.1.22 (proc-macro)
-│   │           │   ├── proc-macro2 v1.0.43 (*)
-│   │           │   ├── quote v1.0.21 (*)
-│   │           │   └── syn v1.0.99 (*)
 │   │           └── tracing-core v0.1.29
 │   │               └── once_cell v1.14.0
 │   │   [build-dependencies]
@@ -319,16 +317,16 @@ clubstatusd v0.4.1 (/home/clonejo/code/clubstatusd)
 │   │   │   │   ├── itoa v1.0.3
 │   │   │   │   ├── pin-project-lite v0.2.9
 │   │   │   │   ├── socket2 v0.4.7 (*)
-│   │   │   │   ├── tokio v1.17.0
+│   │   │   │   ├── tokio v1.21.0
 │   │   │   │   │   ├── libc v0.2.132
 │   │   │   │   │   ├── mio v0.8.4 (*)
+│   │   │   │   │   ├── once_cell v1.14.0
 │   │   │   │   │   ├── pin-project-lite v0.2.9
 │   │   │   │   │   └── socket2 v0.4.7 (*)
+│   │   │   │   │   [build-dependencies]
+│   │   │   │   │   └── autocfg v1.1.0
 │   │   │   │   ├── tower-service v0.3.2
-│   │   │   │   ├── tracing v0.1.36
-│   │   │   │   │   ├── cfg-if v1.0.0
-│   │   │   │   │   ├── pin-project-lite v0.2.9
-│   │   │   │   │   └── tracing-core v0.1.29 (*)
+│   │   │   │   ├── tracing v0.1.36 (*)
 │   │   │   │   └── want v0.3.0
 │   │   │   │       ├── log v0.4.17
 │   │   │   │       │   └── cfg-if v1.0.0
@@ -345,7 +343,7 @@ clubstatusd v0.4.1 (/home/clonejo/code/clubstatusd)
 │   │   │   │   └── memchr v2.5.0
 │   │   │   ├── state v0.5.3
 │   │   │   ├── time v0.3.14 (*)
-│   │   │   ├── tokio v1.17.0 (*)
+│   │   │   ├── tokio v1.21.0 (*)
 │   │   │   └── uncased v0.9.7
 │   │   │       [build-dependencies]
 │   │   │       └── version_check v0.9.4
@@ -370,8 +368,8 @@ clubstatusd v0.4.1 (/home/clonejo/code/clubstatusd)
 │   │   │   │   ├── http v0.2.8 (*)
 │   │   │   │   ├── indexmap v1.9.1 (*)
 │   │   │   │   ├── slab v0.4.7 (*)
-│   │   │   │   ├── tokio v1.17.0 (*)
-│   │   │   │   ├── tokio-util v0.7.2 (*)
+│   │   │   │   ├── tokio v1.21.0 (*)
+│   │   │   │   ├── tokio-util v0.7.3 (*)
 │   │   │   │   └── tracing v0.1.36 (*)
 │   │   │   ├── http v0.2.8 (*)
 │   │   │   ├── http-body v0.4.5 (*)
@@ -380,7 +378,7 @@ clubstatusd v0.4.1 (/home/clonejo/code/clubstatusd)
 │   │   │   ├── itoa v1.0.3
 │   │   │   ├── pin-project-lite v0.2.9
 │   │   │   ├── socket2 v0.4.7 (*)
-│   │   │   ├── tokio v1.17.0 (*)
+│   │   │   ├── tokio v1.21.0 (*)
 │   │   │   ├── tower-service v0.3.2
 │   │   │   ├── tracing v0.1.36 (*)
 │   │   │   └── want v0.3.0 (*)
@@ -396,7 +394,7 @@ clubstatusd v0.4.1 (/home/clonejo/code/clubstatusd)
 │   │   ├── stable-pattern v0.1.0 (*)
 │   │   ├── state v0.5.3
 │   │   ├── time v0.3.14 (*)
-│   │   ├── tokio v1.17.0 (*)
+│   │   ├── tokio v1.21.0 (*)
 │   │   └── uncased v0.9.7 (*)
 │   ├── serde v1.0.144 (*)
 │   ├── state v0.5.3
@@ -406,12 +404,12 @@ clubstatusd v0.4.1 (/home/clonejo/code/clubstatusd)
 │   │   ├── libc v0.2.132
 │   │   └── remove_dir_all v0.5.3
 │   ├── time v0.3.14 (*)
-│   ├── tokio v1.17.0 (*)
+│   ├── tokio v1.21.0 (*)
 │   ├── tokio-stream v0.1.9
 │   │   ├── futures-core v0.3.24
 │   │   ├── pin-project-lite v0.2.9
-│   │   └── tokio v1.17.0 (*)
-│   ├── tokio-util v0.7.2 (*)
+│   │   └── tokio v1.21.0 (*)
+│   ├── tokio-util v0.7.3 (*)
 │   ├── ubyte v0.10.2
 │   │   └── serde v1.0.144 (*)
 │   └── yansi v0.5.1
@@ -448,7 +446,7 @@ clubstatusd v0.4.1 (/home/clonejo/code/clubstatusd)
 │   │       ├── proc-macro2 v1.0.43 (*)
 │   │       ├── quote v1.0.21 (*)
 │   │       └── syn v1.0.99 (*)
-│   ├── tokio v1.17.0 (*)
+│   ├── tokio v1.21.0 (*)
 │   └── tokio-rustls v0.23.3
 │       ├── rustls v0.20.6
 │       │   ├── log v0.4.17 (*)
@@ -465,7 +463,7 @@ clubstatusd v0.4.1 (/home/clonejo/code/clubstatusd)
 │       │   └── webpki v0.22.0
 │       │       ├── ring v0.16.20 (*)
 │       │       └── untrusted v0.7.1
-│       ├── tokio v1.17.0 (*)
+│       ├── tokio v1.21.0 (*)
 │       └── webpki v0.22.0 (*)
 ├── rusqlite v0.28.0
 │   ├── bitflags v1.3.2
