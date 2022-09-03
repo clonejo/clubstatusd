@@ -13,7 +13,7 @@ keywords = ["spaceapi"]
 [dependencies]
 chrono = "0.4.0"
 clap = "3.1.2"
-cookie = "0.15.1"
+cookie = "0.16.0"
 config = "0.11.0"
 float-cmp = "0.9.0"
 icalendar = "0.13.1"
