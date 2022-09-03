@@ -18,6 +18,13 @@ clubstatusd v0.4.1 (/home/clonejo/code/clubstatusd)
 │   │   └── os_str_bytes v6.3.0
 │   ├── indexmap v1.9.1
 │   │   ├── hashbrown v0.12.3
+│   │   │   └── ahash v0.7.6
+│   │   │       ├── getrandom v0.2.7
+│   │   │       │   ├── cfg-if v1.0.0
+│   │   │       │   └── libc v0.2.132
+│   │   │       └── once_cell v1.14.0
+│   │   │       [build-dependencies]
+│   │   │       └── version_check v0.9.4
 │   │   └── serde v1.0.144
 │   │       └── serde_derive v1.0.144 (proc-macro)
 │   │           ├── proc-macro2 v1.0.43
@@ -86,14 +93,10 @@ clubstatusd v0.4.1 (/home/clonejo/code/clubstatusd)
 │   └── version_check v0.9.4
 ├── float-cmp v0.9.0
 │   └── num-traits v0.2.15 (*)
-├── icalendar v0.11.1
+├── icalendar v0.13.1
 │   ├── chrono v0.4.22 (*)
-│   └── uuid v0.8.2
-│       ├── getrandom v0.2.7
-│       │   ├── cfg-if v1.0.0
-│       │   └── libc v0.2.132
-│       └── sha1 v0.6.1
-│           └── sha1_smol v1.0.0
+│   └── uuid v1.1.2
+│       └── getrandom v0.2.7 (*)
 ├── regex v1.6.0 (*)
 ├── rocket v0.5.0-rc.2
 │   ├── async-stream v0.3.3
@@ -471,22 +474,16 @@ clubstatusd v0.4.1 (/home/clonejo/code/clubstatusd)
 │   │   ├── tokio v1.21.0 (*)
 │   │   └── webpki v0.21.4 (*)
 │   └── webpki v0.21.4 (*)
-├── rusqlite v0.27.0
+├── rusqlite v0.28.0
 │   ├── bitflags v1.3.2
 │   ├── fallible-iterator v0.2.0
 │   ├── fallible-streaming-iterator v0.1.9
-│   ├── hashlink v0.7.0
-│   │   └── hashbrown v0.11.2
-│   │       └── ahash v0.7.6
-│   │           ├── getrandom v0.2.7 (*)
-│   │           └── once_cell v1.14.0
-│   │           [build-dependencies]
-│   │           └── version_check v0.9.4
-│   ├── libsqlite3-sys v0.24.2
+│   ├── hashlink v0.8.0
+│   │   └── hashbrown v0.12.3 (*)
+│   ├── libsqlite3-sys v0.25.1
 │   │   [build-dependencies]
 │   │   ├── pkg-config v0.3.25
 │   │   └── vcpkg v0.2.15
-│   ├── memchr v2.5.0
 │   └── smallvec v1.9.0
 ├── serde v1.0.144 (*)
 ├── serde_json v1.0.85 (*)
@@ -506,5 +503,8 @@ clubstatusd v0.4.1 (/home/clonejo/code/clubstatusd)
 │   ├── log v0.4.17 (*)
 │   ├── serde v1.0.144 (*)
 │   └── serde_json v1.0.85 (*)
-├── time v0.2.27 (*)
-└── uuid v0.8.2 (*)
+├── time v0.3.14 (*)
+└── uuid v0.8.2
+    ├── getrandom v0.2.7 (*)
+    └── sha1 v0.6.1
+        └── sha1_smol v1.0.0
