@@ -54,7 +54,7 @@ fn event_set_uuid_from_aid(event: &mut Event, aid: u64) {
     let aid_bytes = aid.to_le_bytes();
     event.uid(
         Uuid::new_v5(&namespace_uuid, &aid_bytes)
-            .to_hyphenated()
+            .hyphenated()
             .encode_lower(&mut Uuid::encode_buffer()),
     );
 }

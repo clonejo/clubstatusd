@@ -275,7 +275,7 @@ dependencies = [
  "sodiumoxide",
  "spaceapi",
  "time 0.3.14",
- "uuid 0.8.2",
+ "uuid",
 ]
 
 [[package]]
@@ -759,7 +759,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "fb35c5cc6489141df16934450e2dfc1058201dbca89c3eba4fa8babd4ae7c845"
 dependencies = [
  "chrono",
- "uuid 1.1.2",
+ "uuid",
 ]
 
 [[package]]
@@ -2087,21 +2087,12 @@ checksum = "a156c684c91ea7d62626509bce3cb4e1d9ed5c4d978f7b4352658f96a4c26b4a"
 
 [[package]]
 name = "uuid"
-version = "0.8.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bc5cf98d8186244414c848017f0e2676b3fcb46807f6668a97dfe67359a3c4b7"
-dependencies = [
- "getrandom",
- "sha1",
-]
-
-[[package]]
-name = "uuid"
 version = "1.1.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "dd6469f4314d5f1ffec476e05f17cc9a78bc7a27a6a857842170bdf8d6f98d2f"
 dependencies = [
  "getrandom",
+ "sha1_smol",
 ]
 
 [[package]]

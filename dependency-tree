@@ -96,7 +96,8 @@ clubstatusd v0.4.1 (/home/clonejo/code/clubstatusd)
 ├── icalendar v0.13.1
 │   ├── chrono v0.4.22 (*)
 │   └── uuid v1.1.2
-│       └── getrandom v0.2.7 (*)
+│       ├── getrandom v0.2.7 (*)
+│       └── sha1_smol v1.0.0
 ├── regex v1.6.0 (*)
 ├── rocket v0.5.0-rc.2
 │   ├── async-stream v0.3.3
@@ -504,7 +505,4 @@ clubstatusd v0.4.1 (/home/clonejo/code/clubstatusd)
 │   ├── serde v1.0.144 (*)
 │   └── serde_json v1.0.85 (*)
 ├── time v0.3.14 (*)
-└── uuid v0.8.2
-    ├── getrandom v0.2.7 (*)
-    └── sha1 v0.6.1
-        └── sha1_smol v1.0.0
+└── uuid v1.1.2 (*)
