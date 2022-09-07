@@ -8,7 +8,7 @@ use rocket::response::{Responder, Response};
 use rocket::State;
 use uuid::Uuid;
 
-use super::{AuthRequired, Authenticated, DbCon, ToPublic};
+use super::{Authenticated, DbCon, ToPublic};
 
 #[get("/api/v0/announcement/current.ics")]
 pub(super) fn announcement_current(
@@ -28,7 +28,7 @@ pub(super) fn announcement_current(
             ev
         })
         .collect();
-    IcsResponder::new(AuthRequired::Required, http::Status::Ok, ics)
+    IcsResponder::new(http::Status::Ok, ics)
 }
 
 #[get("/api/v0/announcement/current.ics?public")]
@@ -46,7 +46,7 @@ pub(super) fn announcement_current_public(shared_con: &State<Arc<Mutex<DbCon>>>)
             ev
         })
         .collect();
-    IcsResponder::new(AuthRequired::Public, http::Status::Ok, ics)
+    IcsResponder::new(http::Status::Ok, ics)
 }
 
 fn event_set_uuid_from_aid(event: &mut Event, aid: u64) {
@@ -60,20 +60,12 @@ fn event_set_uuid_from_aid(event: &mut Event, aid: u64) {
 }
 
 pub(super) struct IcsResponder {
-    auth_required: AuthRequired,
     status: http::Status,
     calendar: Calendar,
 }
 impl IcsResponder {
-    // TODO: either take the Authenticated guard (with reference to request) or a new
-    // Unauthenticated guard (also with reference to request) as paramater, to avoid mistakes with
-    // `auth_required`.
-    fn new(auth_required: AuthRequired, status: http::Status, calendar: Calendar) -> Self {
-        IcsResponder {
-            auth_required,
-            status,
-            calendar,
-        }
+    fn new(status: http::Status, calendar: Calendar) -> Self {
+        IcsResponder { status, calendar }
     }
 }
 impl<'r, 'o: 'r> Responder<'r, 'o> for IcsResponder {
@@ -85,9 +77,6 @@ impl<'r, 'o: 'r> Responder<'r, 'o> for IcsResponder {
         s.push('\n'); // add trailing newline
         let mut res = Response::build();
         res.header(ContentType::new("text", "calendar; charset=utf-8"));
-        if self.auth_required == AuthRequired::Public {
-            res.header(Header::new("Access-Control-Allow-Origin", "*"));
-        }
         res.status(self.status).sized_body(s.len(), Cursor::new(s));
         Ok(res.finalize())
     }

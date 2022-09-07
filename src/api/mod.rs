@@ -12,6 +12,7 @@ use std::sync::{Arc, Mutex};
 use chrono::{Datelike, TimeZone, Utc};
 use regex::Regex;
 use rocket::data::{self, Data, FromData, ToByteUnit};
+use rocket::fairing::AdHoc;
 use rocket::form::{self, FromFormField, ValueField};
 use rocket::http::{self, ContentType, Cookie, CookieJar, Header};
 use rocket::request::{self, FromRequest, Request};
@@ -76,8 +77,15 @@ pub fn run(
                 announcement_current_public,
                 ics::announcement_current,
                 ics::announcement_current_public,
+                all_options,
             ],
-        );
+        )
+        .attach(AdHoc::on_response("access-control", |req, res| {
+            Box::pin(async move {
+                res.set_header(Header::new("Access-Control-Allow-Origin", "*"));
+                res.set_header(Header::new("Access-Control-Allow-Headers", "Authorization"));
+            })
+        }));
 
     if let Some(s) = spaceapi_static {
         rocket = rocket.manage(s).mount("/", routes![spaceapi_]);
@@ -190,11 +198,7 @@ struct ApiVersions {
 
 #[get("/api/versions")]
 fn api_versions() -> RestResponder<ApiVersions> {
-    RestResponder::new(
-        AuthRequired::Public,
-        http::Status::Ok,
-        ApiVersions { versions: vec![0] },
-    )
+    RestResponder::new(http::Status::Ok, ApiVersions { versions: vec![0] })
 }
 
 #[derive(Deserialize)]
@@ -523,7 +527,6 @@ fn create_action(
         }
         Err(_) => {
             return Ok(RestResponder::new(
-                AuthRequired::Required,
                 http::Status::InternalServerError,
                 CreateActionResponse::Error,
             ))
@@ -537,13 +540,11 @@ fn create_action(
                 Some(action_id) => {
                     transaction.commit().unwrap();
                     Ok(RestResponder::new(
-                        AuthRequired::Required,
                         http::Status::Ok,
                         CreateActionResponse::ActionCreated(action_id),
                     ))
                 }
                 None => Ok(RestResponder::new(
-                    AuthRequired::Required,
                     http::Status::InternalServerError,
                     CreateActionResponse::Error,
                 )),
@@ -556,13 +557,11 @@ fn create_action(
                 Some(action_id) => {
                     transaction.commit().unwrap();
                     Ok(RestResponder::new(
-                        AuthRequired::Required,
                         http::Status::Ok,
                         CreateActionResponse::ActionCreated(action_id),
                     ))
                 }
                 None => Ok(RestResponder::new(
-                    AuthRequired::Required,
                     http::Status::InternalServerError,
                     CreateActionResponse::Error,
                 )),
@@ -571,7 +570,6 @@ fn create_action(
         ActionRequest::Presence(presence_request) => {
             presence_tracker.send(presence_request).unwrap();
             Ok(RestResponder::new(
-                AuthRequired::Required,
                 http::Status::Ok,
                 CreateActionResponse::PresenceRecorded,
             ))
@@ -588,7 +586,7 @@ fn status_current(
     let last = db::status::get_last(&*con).unwrap();
     let changed = db::status::get_last_changed(&*con).unwrap();
     let status_current = StatusCurrent { last, changed };
-    RestResponder::new(AuthRequired::Required, http::Status::Ok, status_current)
+    RestResponder::new(http::Status::Ok, status_current)
 }
 #[get("/api/v0/status/current?public")]
 fn status_current_public(
@@ -600,7 +598,7 @@ fn status_current_public(
         .unwrap()
         .to_public();
     let status_current = StatusCurrentPublic { changed };
-    RestResponder::new(AuthRequired::Public, http::Status::Ok, status_current)
+    RestResponder::new(http::Status::Ok, status_current)
 }
 #[derive(Serialize)]
 struct StatusCurrent {
@@ -612,37 +610,16 @@ struct StatusCurrentPublic {
     changed: PublicStatusAction,
 }
 
-#[derive(PartialEq)]
-enum AuthRequired {
-    Required,
-    Public,
-}
-impl Default for AuthRequired {
-    fn default() -> AuthRequired {
-        AuthRequired::Required
-    }
-}
-
 /**
  * Responder for json.
- *
- * Can optionally set header `Access-Control-Allow-Origin: *`.
  */
 struct RestResponder<J: Serialize> {
-    auth_required: AuthRequired,
     status: http::Status,
     response: J,
 }
 impl<J: Serialize> RestResponder<J> {
-    // TODO: either take the Authenticated guard (with reference to request) or a new
-    // Unauthenticated guard (also with reference to request) as paramater, to avoid mistakes with
-    // `auth_required`.
-    fn new(auth_required: AuthRequired, status: http::Status, response: J) -> Self {
-        RestResponder {
-            auth_required,
-            status,
-            response,
-        }
+    fn new(status: http::Status, response: J) -> Self {
+        RestResponder { status, response }
     }
 }
 impl<'r, 'o: 'r, J: Serialize> Responder<'r, 'o> for RestResponder<J> {
@@ -654,9 +631,6 @@ impl<'r, 'o: 'r, J: Serialize> Responder<'r, 'o> for RestResponder<J> {
         json_str.push('\n'); // add trailing newline
         let mut res = Response::build();
         res.header(ContentType::JSON);
-        if self.auth_required == AuthRequired::Public {
-            res.header(Header::new("Access-Control-Allow-Origin", "*"));
-        }
         res.status(self.status)
             .sized_body(json_str.len(), Cursor::new(json_str));
         Ok(res.finalize())
@@ -696,7 +670,7 @@ fn announcement_current(
     let con = shared_con.lock().unwrap();
     let actions = db::announcements::get_current(&*con).unwrap();
     let r = CurrentAnnouncements { actions };
-    RestResponder::new(AuthRequired::Required, http::Status::Ok, r)
+    RestResponder::new(http::Status::Ok, r)
 }
 #[derive(Serialize)]
 #[serde(rename_all = "snake_case")]
@@ -714,7 +688,7 @@ fn announcement_current_public(
         .map(|a| a.to_public())
         .collect();
     let r = CurrentPublicAnnouncements { actions };
-    RestResponder::new(AuthRequired::Public, http::Status::Ok, r)
+    RestResponder::new(http::Status::Ok, r)
 }
 
 #[derive(Debug)]
@@ -853,11 +827,7 @@ fn query(
     let mut con = shared_con.lock().unwrap();
     let actions = db::query(r#type, id, time, count, take, &mut *con).unwrap();
 
-    RestResponder::new(
-        AuthRequired::Required,
-        http::Status::Ok,
-        QueryResponse { actions },
-    )
+    RestResponder::new(http::Status::Ok, QueryResponse { actions })
 }
 
 #[get("/spaceapi")]
@@ -874,7 +844,7 @@ fn spaceapi_(
     status.state.open = Some(changed_action.status == Status::Public);
     status.state.lastchange = Some(changed_action.action.time.try_into().unwrap());
 
-    RestResponder::new(AuthRequired::Public, http::Status::Ok, status)
+    RestResponder::new(http::Status::Ok, status)
 }
 
 #[derive(Debug, Serialize)]
@@ -953,6 +923,12 @@ impl ToPublic for AnnouncementAction {
             note: self.action.note.clone(),
         }
     }
+}
+
+/// Catches all OPTION requests in order to get the CORS related Fairing triggered.
+#[options("/<_..>")]
+fn all_options() {
+    /* Intentionally left empty */
 }
 
 #[cfg(test)]
