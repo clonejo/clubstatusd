@@ -10,6 +10,7 @@ use std::sync::mpsc::SyncSender;
 use std::sync::{Arc, Mutex};
 
 use chrono::{Datelike, TimeZone, Utc};
+use cookie::Expiration;
 use regex::Regex;
 use rocket::data::{self, Data, FromData, ToByteUnit};
 use rocket::fairing::AdHoc;
@@ -19,12 +20,12 @@ use rocket::request::{self, FromRequest, Request};
 use rocket::response::{Responder, Response};
 use rocket::serde::de::{self, Visitor};
 use rocket::serde::{Deserialize, Deserializer, Serialize};
-use rocket::time::Duration;
 use rocket::{Build, Config, Rocket, State};
 use rocket_basicauth::BasicAuth;
 use sodiumoxide::crypto::pwhash;
 use sodiumoxide::crypto::pwhash::Salt;
 use spaceapi::Status as SpaceapiStatus;
+use time::OffsetDateTime;
 
 use crate::db;
 use crate::db::DbCon;
@@ -161,11 +162,11 @@ fn generate_cookie(cookie_salt: &Salt, password: &str) -> String {
 fn set_auth_cookie(cookie_jar: &CookieJar, cookie: &str) {
     // cookie expires in 1 to 2 years
     let expiration_year = Utc::today().year() + 2;
-    let expire_time = Utc.ymd(expiration_year, 1, 1).and_hms(0, 0, 0);
+    let expire_time_chrono = Utc.ymd(expiration_year, 1, 1).and_hms(0, 0, 0);
+    let expire_time = OffsetDateTime::from_unix_timestamp(expire_time_chrono.timestamp()).unwrap();
     let cookie = Cookie::build("clubstatusd-password", cookie.to_string())
         .path("/")
-        //.expires(&expire_time)
-        .max_age(Duration::weeks(53))
+        .expires(Expiration::DateTime(expire_time))
         .finish();
     cookie_jar.add(cookie);
 }
