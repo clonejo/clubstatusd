@@ -3,7 +3,7 @@ use std::sync::{Arc, Mutex};
 
 use chrono::{TimeZone, Utc};
 use icalendar::{Calendar, Component, Event};
-use rocket::http::{self, ContentType, Header};
+use rocket::http::{self, ContentType};
 use rocket::response::{Responder, Response};
 use rocket::State;
 use uuid::Uuid;

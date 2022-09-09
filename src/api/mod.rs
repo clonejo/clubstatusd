@@ -80,7 +80,7 @@ pub fn run(
                 all_options,
             ],
         )
-        .attach(AdHoc::on_response("access-control", |req, res| {
+        .attach(AdHoc::on_response("access-control", |_req, res| {
             Box::pin(async move {
                 res.set_header(Header::new("Access-Control-Allow-Origin", "*"));
                 res.set_header(Header::new("Access-Control-Allow-Headers", "Authorization"));
