@@ -25,9 +25,6 @@ Build dependencies: Rust and Cargo
 
 To build, run `cargo build --release`
 
-# Dependency Graph
-![DAG of dependency crates created using cargo-deps](dependencies.png)
-
 # API examples
 ## Create announcement
 ```sh

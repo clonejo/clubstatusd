@@ -1,6 +1,6 @@
 clubstatusd v0.4.1 (/home/clonejo/code/clubstatusd)
 ├── chrono v0.4.22
-│   ├── iana-time-zone v0.1.47
+│   ├── iana-time-zone v0.1.48
 │   ├── num-integer v0.1.45
 │   │   └── num-traits v0.2.15
 │   │       [build-dependencies]
@@ -10,7 +10,7 @@ clubstatusd v0.4.1 (/home/clonejo/code/clubstatusd)
 │   ├── num-traits v0.2.15 (*)
 │   └── time v0.1.44
 │       └── libc v0.2.132
-├── clap v3.2.20
+├── clap v3.2.22
 │   ├── atty v0.2.14
 │   │   └── libc v0.2.132
 │   ├── bitflags v1.3.2
@@ -28,42 +28,71 @@ clubstatusd v0.4.1 (/home/clonejo/code/clubstatusd)
 │   │   └── serde v1.0.144
 │   │       └── serde_derive v1.0.144 (proc-macro)
 │   │           ├── proc-macro2 v1.0.43
-│   │           │   └── unicode-ident v1.0.3
+│   │           │   └── unicode-ident v1.0.4
 │   │           ├── quote v1.0.21
 │   │           │   └── proc-macro2 v1.0.43 (*)
 │   │           └── syn v1.0.99
 │   │               ├── proc-macro2 v1.0.43 (*)
 │   │               ├── quote v1.0.21 (*)
-│   │               └── unicode-ident v1.0.3
+│   │               └── unicode-ident v1.0.4
 │   │   [build-dependencies]
 │   │   └── autocfg v1.1.0
 │   ├── strsim v0.10.0
 │   ├── termcolor v1.1.3
-│   └── textwrap v0.15.0
-├── config v0.11.0
+│   └── textwrap v0.15.1
+├── config v0.13.2
+│   ├── async-trait v0.1.57 (proc-macro)
+│   │   ├── proc-macro2 v1.0.43 (*)
+│   │   ├── quote v1.0.21 (*)
+│   │   └── syn v1.0.99 (*)
+│   ├── json5 v0.4.1
+│   │   ├── pest v2.3.1
+│   │   │   ├── thiserror v1.0.35
+│   │   │   │   └── thiserror-impl v1.0.35 (proc-macro)
+│   │   │   │       ├── proc-macro2 v1.0.43 (*)
+│   │   │   │       ├── quote v1.0.21 (*)
+│   │   │   │       └── syn v1.0.99 (*)
+│   │   │   └── ucd-trie v0.1.5
+│   │   ├── pest_derive v2.3.1 (proc-macro)
+│   │   │   ├── pest v2.3.1 (*)
+│   │   │   └── pest_generator v2.3.1
+│   │   │       ├── pest v2.3.1 (*)
+│   │   │       ├── pest_meta v2.3.1
+│   │   │       │   ├── once_cell v1.14.0
+│   │   │       │   └── pest v2.3.1 (*)
+│   │   │       │   [build-dependencies]
+│   │   │       │   └── sha1 v0.10.5
+│   │   │       │       ├── cfg-if v1.0.0
+│   │   │       │       ├── cpufeatures v0.2.5
+│   │   │       │       └── digest v0.10.5
+│   │   │       │           ├── block-buffer v0.10.3
+│   │   │       │           │   └── generic-array v0.14.6
+│   │   │       │           │       └── typenum v1.15.0
+│   │   │       │           │       [build-dependencies]
+│   │   │       │           │       └── version_check v0.9.4
+│   │   │       │           ├── crypto-common v0.1.6
+│   │   │       │           │   ├── generic-array v0.14.6 (*)
+│   │   │       │           │   └── typenum v1.15.0
+│   │   │       │           └── subtle v2.4.1
+│   │   │       ├── proc-macro2 v1.0.43 (*)
+│   │   │       ├── quote v1.0.21 (*)
+│   │   │       └── syn v1.0.99 (*)
+│   │   └── serde v1.0.144 (*)
 │   ├── lazy_static v1.4.0
-│   ├── nom v5.1.2
-│   │   ├── lexical-core v0.7.6
-│   │   │   ├── arrayvec v0.5.2
-│   │   │   ├── bitflags v1.3.2
-│   │   │   ├── cfg-if v1.0.0
-│   │   │   ├── ryu v1.0.11
-│   │   │   └── static_assertions v1.1.0
-│   │   └── memchr v2.5.0
-│   │   [build-dependencies]
-│   │   └── version_check v0.9.4
-│   ├── rust-ini v0.13.0
+│   ├── nom v7.1.1
+│   │   ├── memchr v2.5.0
+│   │   └── minimal-lexical v0.2.1
+│   ├── pathdiff v0.2.1
+│   ├── ron v0.7.1
+│   │   ├── base64 v0.13.0
+│   │   ├── bitflags v1.3.2
+│   │   └── serde v1.0.144 (*)
+│   ├── rust-ini v0.18.0
+│   │   ├── cfg-if v1.0.0
+│   │   └── ordered-multimap v0.4.3
+│   │       ├── dlv-list v0.3.0
+│   │       └── hashbrown v0.12.3 (*)
 │   ├── serde v1.0.144 (*)
-│   ├── serde-hjson v0.9.1
-│   │   ├── lazy_static v1.4.0
-│   │   ├── num-traits v0.1.43
-│   │   │   └── num-traits v0.2.15 (*)
-│   │   ├── regex v1.6.0
-│   │   │   ├── aho-corasick v0.7.19
-│   │   │   │   └── memchr v2.5.0
-│   │   │   ├── memchr v2.5.0
-│   │   │   └── regex-syntax v0.6.27
-│   │   └── serde v0.8.23
 │   ├── serde_json v1.0.85
 │   │   ├── itoa v1.0.3
 │   │   ├── ryu v1.0.11
@@ -75,15 +104,12 @@ clubstatusd v0.4.1 (/home/clonejo/code/clubstatusd)
 ├── cookie v0.16.0
 │   ├── aes-gcm v0.9.4
 │   │   ├── aead v0.4.3
-│   │   │   └── generic-array v0.14.6
-│   │   │       └── typenum v1.15.0
-│   │   │       [build-dependencies]
-│   │   │       └── version_check v0.9.4
+│   │   │   └── generic-array v0.14.6 (*)
 │   │   ├── aes v0.7.5
 │   │   │   ├── cfg-if v1.0.0
 │   │   │   ├── cipher v0.3.0
 │   │   │   │   └── generic-array v0.14.6 (*)
-│   │   │   ├── cpufeatures v0.2.4
+│   │   │   ├── cpufeatures v0.2.5
 │   │   │   └── opaque-debug v0.3.0
 │   │   ├── cipher v0.3.0 (*)
 │   │   ├── ctr v0.8.0
@@ -92,7 +118,7 @@ clubstatusd v0.4.1 (/home/clonejo/code/clubstatusd)
 │   │   │   ├── opaque-debug v0.3.0
 │   │   │   └── polyval v0.5.3
 │   │   │       ├── cfg-if v1.0.0
-│   │   │       ├── cpufeatures v0.2.4
+│   │   │       ├── cpufeatures v0.2.5
 │   │   │       ├── opaque-debug v0.3.0
 │   │   │       └── universal-hash v0.4.1
 │   │   │           ├── generic-array v0.14.6 (*)
@@ -101,26 +127,20 @@ clubstatusd v0.4.1 (/home/clonejo/code/clubstatusd)
 │   ├── base64 v0.13.0
 │   ├── hkdf v0.12.3
 │   │   └── hmac v0.12.1
-│   │       └── digest v0.10.3
-│   │           ├── block-buffer v0.10.2
-│   │           │   └── generic-array v0.14.6 (*)
-│   │           ├── crypto-common v0.1.6
-│   │           │   ├── generic-array v0.14.6 (*)
-│   │           │   └── typenum v1.15.0
-│   │           └── subtle v2.4.1
+│   │       └── digest v0.10.5 (*)
 │   ├── hmac v0.12.1 (*)
-│   ├── percent-encoding v2.1.0
+│   ├── percent-encoding v2.2.0
 │   ├── rand v0.8.5
 │   │   ├── libc v0.2.132
 │   │   ├── rand_chacha v0.3.1
 │   │   │   ├── ppv-lite86 v0.2.16
-│   │   │   └── rand_core v0.6.3
+│   │   │   └── rand_core v0.6.4
 │   │   │       └── getrandom v0.2.7 (*)
-│   │   └── rand_core v0.6.3 (*)
-│   ├── sha2 v0.10.5
+│   │   └── rand_core v0.6.4 (*)
+│   ├── sha2 v0.10.6
 │   │   ├── cfg-if v1.0.0
-│   │   ├── cpufeatures v0.2.4
-│   │   └── digest v0.10.3 (*)
+│   │   ├── cpufeatures v0.2.5
+│   │   └── digest v0.10.5 (*)
 │   ├── subtle v2.4.1
 │   └── time v0.3.14
 │       ├── itoa v1.0.3
@@ -136,7 +156,11 @@ clubstatusd v0.4.1 (/home/clonejo/code/clubstatusd)
 │   └── uuid v1.1.2
 │       ├── getrandom v0.2.7 (*)
 │       └── sha1_smol v1.0.0
-├── regex v1.6.0 (*)
+├── regex v1.6.0
+│   ├── aho-corasick v0.7.19
+│   │   └── memchr v2.5.0
+│   ├── memchr v2.5.0
+│   └── regex-syntax v0.6.27
 ├── rocket v0.5.0-rc.2
 │   ├── async-stream v0.3.3
 │   │   ├── async-stream-impl v0.3.3 (proc-macro)
@@ -144,10 +168,7 @@ clubstatusd v0.4.1 (/home/clonejo/code/clubstatusd)
 │   │   │   ├── quote v1.0.21 (*)
 │   │   │   └── syn v1.0.99 (*)
 │   │   └── futures-core v0.3.24
-│   ├── async-trait v0.1.57 (proc-macro)
-│   │   ├── proc-macro2 v1.0.43 (*)
-│   │   ├── quote v1.0.21 (*)
-│   │   └── syn v1.0.99 (*)
+│   ├── async-trait v0.1.57 (proc-macro) (*)
 │   ├── atomic v0.5.1
 │   │   [build-dependencies]
 │   │   └── autocfg v1.1.0
@@ -155,7 +176,7 @@ clubstatusd v0.4.1 (/home/clonejo/code/clubstatusd)
 │   ├── binascii v0.1.4
 │   ├── bytes v1.2.1
 │   ├── either v1.8.0
-│   ├── figment v0.10.6
+│   ├── figment v0.10.7
 │   │   ├── pear v0.2.3
 │   │   │   ├── inlinable_string v0.1.15
 │   │   │   ├── pear_codegen v0.2.3 (proc-macro)
@@ -220,7 +241,7 @@ clubstatusd v0.4.1 (/home/clonejo/code/clubstatusd)
 │   │   │       └── scopeguard v1.1.0
 │   │   │       [build-dependencies]
 │   │   │       └── autocfg v1.1.0
-│   │   ├── tokio v1.21.0
+│   │   ├── tokio v1.21.1
 │   │   │   ├── bytes v1.2.1
 │   │   │   ├── libc v0.2.132
 │   │   │   ├── memchr v2.5.0
@@ -241,12 +262,12 @@ clubstatusd v0.4.1 (/home/clonejo/code/clubstatusd)
 │   │   │       └── syn v1.0.99 (*)
 │   │   │   [build-dependencies]
 │   │   │   └── autocfg v1.1.0
-│   │   └── tokio-util v0.7.3
+│   │   └── tokio-util v0.7.4
 │   │       ├── bytes v1.2.1
 │   │       ├── futures-core v0.3.24
 │   │       ├── futures-sink v0.3.24
 │   │       ├── pin-project-lite v0.2.9
-│   │       ├── tokio v1.21.0 (*)
+│   │       ├── tokio v1.21.1 (*)
 │   │       └── tracing v0.1.36
 │   │           ├── cfg-if v1.0.0
 │   │           ├── pin-project-lite v0.2.9
@@ -317,7 +338,7 @@ clubstatusd v0.4.1 (/home/clonejo/code/clubstatusd)
 │   │   │   │   ├── itoa v1.0.3
 │   │   │   │   ├── pin-project-lite v0.2.9
 │   │   │   │   ├── socket2 v0.4.7 (*)
-│   │   │   │   ├── tokio v1.21.0
+│   │   │   │   ├── tokio v1.21.1
 │   │   │   │   │   ├── libc v0.2.132
 │   │   │   │   │   ├── mio v0.8.4 (*)
 │   │   │   │   │   ├── once_cell v1.14.0
@@ -335,7 +356,7 @@ clubstatusd v0.4.1 (/home/clonejo/code/clubstatusd)
 │   │   │   ├── log v0.4.17 (*)
 │   │   │   ├── memchr v2.5.0
 │   │   │   ├── pear v0.2.3 (*)
-│   │   │   ├── percent-encoding v2.1.0
+│   │   │   ├── percent-encoding v2.2.0
 │   │   │   ├── pin-project-lite v0.2.9
 │   │   │   ├── ref-cast v1.0.9 (*)
 │   │   │   ├── smallvec v1.9.0
@@ -343,12 +364,12 @@ clubstatusd v0.4.1 (/home/clonejo/code/clubstatusd)
 │   │   │   │   └── memchr v2.5.0
 │   │   │   ├── state v0.5.3
 │   │   │   ├── time v0.3.14 (*)
-│   │   │   ├── tokio v1.21.0 (*)
+│   │   │   ├── tokio v1.21.1 (*)
 │   │   │   └── uncased v0.9.7
 │   │   │       [build-dependencies]
 │   │   │       └── version_check v0.9.4
 │   │   ├── syn v1.0.99 (*)
-│   │   └── unicode-xid v0.2.3
+│   │   └── unicode-xid v0.2.4
 │   ├── rocket_http v0.5.0-rc.2
 │   │   ├── cookie v0.16.0 (*)
 │   │   ├── either v1.8.0
@@ -368,8 +389,8 @@ clubstatusd v0.4.1 (/home/clonejo/code/clubstatusd)
 │   │   │   │   ├── http v0.2.8 (*)
 │   │   │   │   ├── indexmap v1.9.1 (*)
 │   │   │   │   ├── slab v0.4.7 (*)
-│   │   │   │   ├── tokio v1.21.0 (*)
-│   │   │   │   ├── tokio-util v0.7.3 (*)
+│   │   │   │   ├── tokio v1.21.1 (*)
+│   │   │   │   ├── tokio-util v0.7.4 (*)
 │   │   │   │   └── tracing v0.1.36 (*)
 │   │   │   ├── http v0.2.8 (*)
 │   │   │   ├── http-body v0.4.5 (*)
@@ -378,7 +399,7 @@ clubstatusd v0.4.1 (/home/clonejo/code/clubstatusd)
 │   │   │   ├── itoa v1.0.3
 │   │   │   ├── pin-project-lite v0.2.9
 │   │   │   ├── socket2 v0.4.7 (*)
-│   │   │   ├── tokio v1.21.0 (*)
+│   │   │   ├── tokio v1.21.1 (*)
 │   │   │   ├── tower-service v0.3.2
 │   │   │   ├── tracing v0.1.36 (*)
 │   │   │   └── want v0.3.0 (*)
@@ -386,7 +407,7 @@ clubstatusd v0.4.1 (/home/clonejo/code/clubstatusd)
 │   │   ├── log v0.4.17 (*)
 │   │   ├── memchr v2.5.0
 │   │   ├── pear v0.2.3 (*)
-│   │   ├── percent-encoding v2.1.0
+│   │   ├── percent-encoding v2.2.0
 │   │   ├── pin-project-lite v0.2.9
 │   │   ├── ref-cast v1.0.9 (*)
 │   │   ├── serde v1.0.144 (*)
@@ -394,7 +415,7 @@ clubstatusd v0.4.1 (/home/clonejo/code/clubstatusd)
 │   │   ├── stable-pattern v0.1.0 (*)
 │   │   ├── state v0.5.3
 │   │   ├── time v0.3.14 (*)
-│   │   ├── tokio v1.21.0 (*)
+│   │   ├── tokio v1.21.1 (*)
 │   │   └── uncased v0.9.7 (*)
 │   ├── serde v1.0.144 (*)
 │   ├── state v0.5.3
@@ -404,13 +425,13 @@ clubstatusd v0.4.1 (/home/clonejo/code/clubstatusd)
 │   │   ├── libc v0.2.132
 │   │   └── remove_dir_all v0.5.3
 │   ├── time v0.3.14 (*)
-│   ├── tokio v1.21.0 (*)
-│   ├── tokio-stream v0.1.9
+│   ├── tokio v1.21.1 (*)
+│   ├── tokio-stream v0.1.10
 │   │   ├── futures-core v0.3.24
 │   │   ├── pin-project-lite v0.2.9
-│   │   └── tokio v1.21.0 (*)
-│   ├── tokio-util v0.7.3 (*)
-│   ├── ubyte v0.10.2
+│   │   └── tokio v1.21.1 (*)
+│   ├── tokio-util v0.7.4 (*)
+│   ├── ubyte v0.10.3
 │   │   └── serde v1.0.144 (*)
 │   └── yansi v0.5.1
 │   [build-dependencies]
@@ -441,12 +462,8 @@ clubstatusd v0.4.1 (/home/clonejo/code/clubstatusd)
 │   │       └── base64 v0.13.0
 │   ├── rustls-pemfile v0.3.0
 │   │   └── base64 v0.13.0
-│   ├── thiserror v1.0.33
-│   │   └── thiserror-impl v1.0.33 (proc-macro)
-│   │       ├── proc-macro2 v1.0.43 (*)
-│   │       ├── quote v1.0.21 (*)
-│   │       └── syn v1.0.99 (*)
-│   ├── tokio v1.21.0 (*)
+│   ├── thiserror v1.0.35 (*)
+│   ├── tokio v1.21.1 (*)
 │   └── tokio-rustls v0.23.3
 │       ├── rustls v0.20.6
 │       │   ├── log v0.4.17 (*)
@@ -463,13 +480,13 @@ clubstatusd v0.4.1 (/home/clonejo/code/clubstatusd)
 │       │   └── webpki v0.22.0
 │       │       ├── ring v0.16.20 (*)
 │       │       └── untrusted v0.7.1
-│       ├── tokio v1.21.0 (*)
+│       ├── tokio v1.21.1 (*)
 │       └── webpki v0.22.0 (*)
 ├── rusqlite v0.28.0
 │   ├── bitflags v1.3.2
 │   ├── fallible-iterator v0.2.0
 │   ├── fallible-streaming-iterator v0.1.9
-│   ├── hashlink v0.8.0
+│   ├── hashlink v0.8.1
 │   │   └── hashbrown v0.12.3 (*)
 │   ├── libsqlite3-sys v0.25.1
 │   │   [build-dependencies]
@@ -480,7 +497,7 @@ clubstatusd v0.4.1 (/home/clonejo/code/clubstatusd)
 ├── serde_json v1.0.85 (*)
 ├── sodiumoxide v0.2.7
 │   ├── ed25519 v1.5.2
-│   │   └── signature v1.6.0
+│   │   └── signature v1.6.3
 │   ├── libc v0.2.132
 │   ├── libsodium-sys v0.2.7
 │   │   └── libc v0.2.132
