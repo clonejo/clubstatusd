@@ -8,7 +8,6 @@ mod util;
 
 mod model_tests;
 
-use std::io::{stderr, Write};
 use std::path::Path;
 use std::sync::{Arc, Mutex};
 
@@ -41,15 +40,13 @@ async fn rocket() -> _ {
         Ok(conf) => conf,
         Err(err) => {
             if arg_matches.is_present("CONFIG") || config_path.is_file() {
-                writeln!(&mut stderr(), "Error reading config file: {}", err).unwrap();
+                eprintln!("Error reading config file: {}", err);
                 std::process::exit(1);
             }
-            writeln!(
-                &mut stderr(),
+            eprintln!(
                 "No config file found at {}, assuming default values.",
                 config_path.display()
-            )
-            .unwrap();
+            );
             Config::default()
         }
     };
@@ -60,24 +57,17 @@ async fn rocket() -> _ {
     let con = match db::connect(db_path_str.as_str()) {
         Ok(con) => con,
         Err(err) => {
-            writeln!(
-                &mut stderr(),
+            eprintln!(
                 "Could not open database (path: {}), error message:\n{:?}",
-                db_path_str,
-                err
-            )
-            .unwrap();
+                db_path_str, err
+            );
             std::process::exit(1);
         }
     };
     let password = match conf.get_string("password") {
         Ok(s) => Some(s),
         Err(ConfigError::NotFound(_)) => {
-            writeln!(
-                &mut stderr(),
-                "No password set, the whole API will be available unauthenticated."
-            )
-            .unwrap();
+            eprintln!("No password set, the whole API will be available unauthenticated.");
             None
         }
         Err(e) => {
