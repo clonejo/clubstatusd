@@ -35,17 +35,27 @@ async fn rocket() -> _ {
         .get_matches();
 
     let config_path = Path::new(arg_matches.value_of("CONFIG").unwrap_or("/etc/clubstatusd"));
-    let mut conf = Config::default();
-    if let Err(err) = conf.merge(config::File::with_name(config_path.to_str().unwrap())) {
-        if arg_matches.is_present("CONFIG") || config_path.is_file() {
-            writeln!(&mut stderr(), "Error reading config file: {}", err).unwrap();
-            std::process::exit(1);
+    let conf_builder =
+        Config::builder().add_source(config::File::with_name(config_path.to_str().unwrap()));
+    let conf = match conf_builder.build() {
+        Ok(conf) => conf,
+        Err(err) => {
+            if arg_matches.is_present("CONFIG") || config_path.is_file() {
+                writeln!(&mut stderr(), "Error reading config file: {}", err).unwrap();
+                std::process::exit(1);
+            }
+            writeln!(
+                &mut stderr(),
+                "No config file found at {}, assuming default values.",
+                config_path.display()
+            )
+            .unwrap();
+            Config::default()
         }
-        writeln!(&mut stderr(), "No config file, assuming default values.").unwrap();
-    }
+    };
 
     let db_path_str = conf
-        .get_str("database_path")
+        .get_string("database_path")
         .unwrap_or_else(|_| String::from("/var/local/clubstatusd/db.sqlite"));
     let con = match db::connect(db_path_str.as_str()) {
         Ok(con) => con,
@@ -60,7 +70,7 @@ async fn rocket() -> _ {
             std::process::exit(1);
         }
     };
-    let password = match conf.get_str("password") {
+    let password = match conf.get_string("password") {
         Ok(s) => Some(s),
         Err(ConfigError::NotFound(_)) => {
             writeln!(
@@ -75,7 +85,7 @@ async fn rocket() -> _ {
             panic!();
         }
     };
-    let cookie_salt: Salt = match conf.get_str("cookie_salt") {
+    let cookie_salt: Salt = match conf.get_string("cookie_salt") {
         Ok(s) => hex_str_to_salt(s.as_str()),
         Err(ConfigError::NotFound(_)) => pwhash::gen_salt(),
         Err(e) => {
@@ -86,21 +96,21 @@ async fn rocket() -> _ {
 
     let shared_con = Arc::new(Mutex::new(con));
 
-    let mqtt_server = conf.get_str("mqtt.server").ok();
+    let mqtt_server = conf.get_string("mqtt.server").ok();
     let port = conf.get_int("mqtt.port").unwrap_or(1883) as u16;
     let mqtt_topic_prefix = conf
-        .get_str("mqtt.topic_prefix")
+        .get_string("mqtt.topic_prefix")
         .unwrap_or_else(|_| String::from(""));
     let mqtt_handler =
         api::mqtt::start_handler(mqtt_server, port, mqtt_topic_prefix, shared_con.clone());
 
     let spaceapi_static = conf
-        .get_str("spaceapi")
+        .get_string("spaceapi")
         .ok()
         .map(|s| serde_json::from_str(s.as_str()).expect("Cannot parse spaceapi json."));
 
     let listen_addr = conf
-        .get_str("listen")
+        .get_string("listen")
         .unwrap_or_else(|_| String::from("localhost:8000"));
     api::run(
         shared_con,
