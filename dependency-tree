@@ -210,21 +210,29 @@ clubstatusd v0.4.1 (/home/clonejo/code/clubstatusd)
 │   │   │   ├── futures-core v0.3.26
 │   │   │   └── futures-sink v0.3.26
 │   │   ├── futures-core v0.3.26
+│   │   ├── futures-executor v0.3.26
+│   │   │   ├── futures-core v0.3.26
+│   │   │   ├── futures-task v0.3.26
+│   │   │   └── futures-util v0.3.26
+│   │   │       ├── futures-channel v0.3.26 (*)
+│   │   │       ├── futures-core v0.3.26
+│   │   │       ├── futures-io v0.3.26
+│   │   │       ├── futures-macro v0.3.26 (proc-macro)
+│   │   │       │   ├── proc-macro2 v1.0.51 (*)
+│   │   │       │   ├── quote v1.0.23 (*)
+│   │   │       │   └── syn v1.0.109 (*)
+│   │   │       ├── futures-sink v0.3.26
+│   │   │       ├── futures-task v0.3.26
+│   │   │       ├── memchr v2.5.0
+│   │   │       ├── pin-project-lite v0.2.9
+│   │   │       ├── pin-utils v0.1.0
+│   │   │       └── slab v0.4.8
+│   │   │           [build-dependencies]
+│   │   │           └── autocfg v1.1.0
 │   │   ├── futures-io v0.3.26
 │   │   ├── futures-sink v0.3.26
 │   │   ├── futures-task v0.3.26
-│   │   └── futures-util v0.3.26
-│   │       ├── futures-channel v0.3.26 (*)
-│   │       ├── futures-core v0.3.26
-│   │       ├── futures-io v0.3.26
-│   │       ├── futures-sink v0.3.26
-│   │       ├── futures-task v0.3.26
-│   │       ├── memchr v2.5.0
-│   │       ├── pin-project-lite v0.2.9
-│   │       ├── pin-utils v0.1.0
-│   │       └── slab v0.4.8
-│   │           [build-dependencies]
-│   │           └── autocfg v1.1.0
+│   │   └── futures-util v0.3.26 (*)
 │   ├── indexmap v1.9.2 (*)
 │   ├── log v0.4.17
 │   │   └── cfg-if v1.0.0
@@ -448,7 +456,7 @@ clubstatusd v0.4.1 (/home/clonejo/code/clubstatusd)
 │   ├── base64 v0.13.1
 │   ├── log v0.4.17 (*)
 │   └── rocket v0.5.0-rc.2 (*)
-├── rumqttc v0.15.0
+├── rumqttc v0.20.0
 │   ├── bytes v1.4.0
 │   ├── flume v0.10.14
 │   │   ├── futures-core v0.3.26
@@ -461,15 +469,14 @@ clubstatusd v0.4.1 (/home/clonejo/code/clubstatusd)
 │   │   │       ├── quote v1.0.23 (*)
 │   │   │       └── syn v1.0.109 (*)
 │   │   └── spin v0.9.5 (*)
-│   ├── http v0.2.9 (*)
+│   ├── futures v0.3.26 (*)
 │   ├── log v0.4.17 (*)
 │   ├── pollster v0.2.5
 │   ├── rustls-native-certs v0.6.2
 │   │   ├── openssl-probe v0.1.5
 │   │   └── rustls-pemfile v1.0.2
 │   │       └── base64 v0.21.0
-│   ├── rustls-pemfile v0.3.0
-│   │   └── base64 v0.13.1
+│   ├── rustls-pemfile v1.0.2 (*)
 │   ├── thiserror v1.0.38 (*)
 │   ├── tokio v1.25.0 (*)
 │   └── tokio-rustls v0.23.3
