@@ -153,8 +153,11 @@ clubstatusd v0.4.1 (/home/clonejo/code/clubstatusd)
 │   └── version_check v0.9.4
 ├── float-cmp v0.9.0
 │   └── num-traits v0.2.15 (*)
-├── icalendar v0.13.3
+├── icalendar v0.15.4
 │   ├── chrono v0.4.23 (*)
+│   ├── iso8601 v0.6.1
+│   │   └── nom v7.1.3 (*)
+│   ├── nom v7.1.3 (*)
 │   └── uuid v1.3.0
 │       ├── getrandom v0.2.8 (*)
 │       └── sha1_smol v1.0.0

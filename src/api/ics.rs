@@ -2,7 +2,7 @@ use std::io::Cursor;
 use std::sync::{Arc, Mutex};
 
 use chrono::{TimeZone, Utc};
-use icalendar::{Calendar, Component, Event};
+use icalendar::{Calendar, Component, Event, EventLike};
 use rocket::http::{self, ContentType};
 use rocket::response::{Responder, Response};
 use rocket::State;
