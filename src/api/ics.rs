@@ -23,8 +23,8 @@ pub(super) fn announcement_current(
             let mut ev = Event::new();
             event_set_uuid_from_aid(&mut ev, a.aid.unwrap());
             ev.summary(&a.action.note);
-            ev.starts(Utc.timestamp(a.from, 0));
-            ev.ends(Utc.timestamp(a.to, 0));
+            ev.starts(Utc.timestamp_opt(a.from, 0).unwrap());
+            ev.ends(Utc.timestamp_opt(a.to, 0).unwrap());
             ev
         })
         .collect();
@@ -41,8 +41,8 @@ pub(super) fn announcement_current_public(shared_con: &State<Arc<Mutex<DbCon>>>)
             let mut ev = Event::new();
             event_set_uuid_from_aid(&mut ev, a.aid);
             ev.summary(&a.note);
-            ev.starts(Utc.timestamp(a.from, 0));
-            ev.ends(Utc.timestamp(a.to, 0));
+            ev.starts(Utc.timestamp_opt(a.from, 0).unwrap());
+            ev.ends(Utc.timestamp_opt(a.to, 0).unwrap());
             ev
         })
         .collect();

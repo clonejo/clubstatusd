@@ -161,8 +161,8 @@ fn generate_cookie(cookie_salt: &Salt, password: &str) -> String {
 
 fn set_auth_cookie(cookie_jar: &CookieJar, cookie: &str) {
     // cookie expires in 1 to 2 years
-    let expiration_year = Utc::today().year() + 2;
-    let expire_time_chrono = Utc.ymd(expiration_year, 1, 1).and_hms(0, 0, 0);
+    let expiration_year = Utc::now().year() + 2;
+    let expire_time_chrono = Utc.with_ymd_and_hms(expiration_year, 1, 1, 0, 0, 0).unwrap();
     let expire_time = OffsetDateTime::from_unix_timestamp(expire_time_chrono.timestamp()).unwrap();
     let cookie = Cookie::build("clubstatusd-password", cookie.to_string())
         .path("/")
