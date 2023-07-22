@@ -161,7 +161,7 @@ action is send immediately on connecting.
 Create a new action. The attributes `id` and `time` are ignored.
 
 #### PUT Status
-Mandatory members: `type`, `user`, `status`  
+Mandatory members: `type`, `user`, `status`, `note`  
 `public` defaults to `false`.  
 The server returns the action id.
 
