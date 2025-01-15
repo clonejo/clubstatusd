@@ -886,6 +886,7 @@ struct PublicAnnouncementAction {
     pub to: i64,
 
     pub note: String,
+    pub url: Option<Url>,
 }
 
 trait ToPublic {
@@ -931,6 +932,7 @@ impl ToPublic for AnnouncementAction {
             from: self.from,
             to: self.to,
             note: self.action.note.clone(),
+            url: self.url.clone(),
         }
     }
 }
