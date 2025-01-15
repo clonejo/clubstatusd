@@ -16,7 +16,7 @@ pub(super) fn announcement_current(
     shared_con: &State<Arc<Mutex<DbCon>>>,
 ) -> IcsResponder {
     let con = shared_con.lock().unwrap();
-    let actions = crate::db::announcements::get_current(&*con).unwrap();
+    let actions = crate::db::announcements::get_current(&con).unwrap();
     let ics: Calendar = actions
         .iter()
         .map(|a| {
@@ -34,7 +34,7 @@ pub(super) fn announcement_current(
 #[get("/api/v0/announcement/current.ics?public")]
 pub(super) fn announcement_current_public(shared_con: &State<Arc<Mutex<DbCon>>>) -> IcsResponder {
     let con = shared_con.lock().unwrap();
-    let actions = crate::db::announcements::get_current_public(&*con).unwrap();
+    let actions = crate::db::announcements::get_current_public(&con).unwrap();
     let public = actions.iter().map(|a| a.to_public());
     let ics: Calendar = public
         .map(|a| {

@@ -186,7 +186,7 @@ impl fmt::Debug for UserName {
     }
 }
 struct UserNameVisitor;
-impl<'de> Visitor<'de> for UserNameVisitor {
+impl Visitor<'_> for UserNameVisitor {
     type Value = UserName;
 
     fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
@@ -198,7 +198,7 @@ impl<'de> Visitor<'de> for UserNameVisitor {
         E: de::Error,
     {
         let user = String::from(value);
-        if user.len() == 0 || user.len() > 15 {
+        if user.is_empty() || user.len() > 15 {
             return Err(E::custom(format!(
                 "Username '{}' is either empty or longer than 15 bytes.",
                 user

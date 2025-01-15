@@ -315,7 +315,7 @@ impl<'de> Deserialize<'de> for Note {
     }
 }
 struct NoteVisitor;
-impl<'de> Visitor<'de> for NoteVisitor {
+impl Visitor<'_> for NoteVisitor {
     type Value = Note;
 
     fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
@@ -358,7 +358,7 @@ impl<'de> Deserialize<'de> for Time {
     }
 }
 struct TimeVisitor;
-impl<'de> Visitor<'de> for TimeVisitor {
+impl Visitor<'_> for TimeVisitor {
     type Value = Time;
 
     fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
@@ -585,8 +585,8 @@ fn status_current(
     shared_con: &State<Arc<Mutex<DbCon>>>,
 ) -> RestResponder<StatusCurrent> {
     let con = shared_con.lock().unwrap();
-    let last = db::status::get_last(&*con).unwrap();
-    let changed = db::status::get_last_changed(&*con).unwrap();
+    let last = db::status::get_last(&con).unwrap();
+    let changed = db::status::get_last_changed(&con).unwrap();
     let status_current = StatusCurrent { last, changed };
     RestResponder::new(http::Status::Ok, status_current)
 }
@@ -596,7 +596,7 @@ fn status_current_public(
 ) -> RestResponder<StatusCurrentPublic> {
     let con = shared_con.lock().unwrap();
 
-    let changed = db::status::get_last_changed_public(&*con)
+    let changed = db::status::get_last_changed_public(&con)
         .unwrap()
         .to_public();
     let status_current = StatusCurrentPublic { changed };
@@ -670,7 +670,7 @@ fn announcement_current(
     shared_con: &State<Arc<Mutex<DbCon>>>,
 ) -> RestResponder<CurrentAnnouncements> {
     let con = shared_con.lock().unwrap();
-    let actions = db::announcements::get_current(&*con).unwrap();
+    let actions = db::announcements::get_current(&con).unwrap();
     let r = CurrentAnnouncements { actions };
     RestResponder::new(http::Status::Ok, r)
 }
@@ -684,7 +684,7 @@ fn announcement_current_public(
     shared_con: &State<Arc<Mutex<DbCon>>>,
 ) -> RestResponder<CurrentPublicAnnouncements> {
     let con = shared_con.lock().unwrap();
-    let actions = db::announcements::get_current_public(&*con)
+    let actions = db::announcements::get_current_public(&con)
         .unwrap()
         .iter()
         .map(|a| a.to_public())
@@ -827,7 +827,7 @@ fn query(
     let count = if id.is_single() { 1 } else { count };
 
     let mut con = shared_con.lock().unwrap();
-    let actions = db::query(r#type, id, time, count, take, &mut *con).unwrap();
+    let actions = db::query(r#type, id, time, count, take, &mut con).unwrap();
 
     RestResponder::new(http::Status::Ok, QueryResponse { actions })
 }
@@ -839,7 +839,7 @@ fn spaceapi_(
 ) -> RestResponder<SpaceapiStatus> {
     let changed_action = {
         let con = shared_con.lock().unwrap();
-        db::status::get_last_changed_public(&*con).unwrap()
+        db::status::get_last_changed_public(&con).unwrap()
     };
 
     let mut status = spaceapi_static.inner().clone();

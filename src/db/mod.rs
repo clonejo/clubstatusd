@@ -367,7 +367,7 @@ pub mod announcements {
             )
             .unwrap();
         let now = Utc::now().timestamp();
-        let actions_iter = stmt.query_map(&[&now], row_to_announcement_action).unwrap();
+        let actions_iter = stmt.query_map([&now], row_to_announcement_action).unwrap();
         let actions: Vec<AnnouncementAction> = actions_iter.map(|action| action.unwrap()).collect();
         Ok(actions)
     }
@@ -387,7 +387,7 @@ pub mod announcements {
             )
             .unwrap();
         let now = Utc::now().timestamp();
-        let actions_iter = stmt.query_map(&[&now], row_to_announcement_action).unwrap();
+        let actions_iter = stmt.query_map([&now], row_to_announcement_action).unwrap();
         let actions: Vec<AnnouncementAction> = actions_iter.map(|action| action.unwrap()).collect();
         Ok(actions)
     }
@@ -458,7 +458,7 @@ pub mod presence {
             .prepare("SELECT user, since FROM presence_action WHERE id = ?")
             .unwrap();
         let users_iter = stmt
-            .query_map(&[&(action.id.unwrap() as i64)], |row| {
+            .query_map([&(action.id.unwrap() as i64)], |row| {
                 Ok(PresentNamedUser {
                     name: UserName::new(row.get(0)?),
                     since: row.get(1)?,
@@ -472,7 +472,7 @@ pub mod presence {
         let anonymous_users = con
             .query_row(
                 "SELECT anonymous_users FROM presence_anon_action WHERE id = ?",
-                &[&(action.id.unwrap() as i64)],
+                [&(action.id.unwrap() as i64)],
                 |row| row.get(0),
             )
             .unwrap_or(0.0) as f32;
@@ -539,7 +539,7 @@ pub mod presence {
         }
         let last_action = {
             let con = shared_con.lock().unwrap();
-            get_last(&*con).expect("Database is missing initial presence action!")
+            get_last(&con).expect("Database is missing initial presence action!")
         };
         let mut now = Utc::now().timestamp();
         let mut users: HashMap<UserName, UserPresence> = HashMap::new();

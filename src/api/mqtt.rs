@@ -61,7 +61,7 @@ fn publish_announcement(
         .unwrap();
 }
 
-fn publish_presence<'a>(action: &'a PresenceAction, client: &mut Client, topic_prefix: &str) {
+fn publish_presence(action: &PresenceAction, client: &mut Client, topic_prefix: &str) {
     let mut users: Vec<Cow<str>> = action
         .users
         .iter()
@@ -155,14 +155,14 @@ pub fn start_handler(
 
                     let last_status = {
                         let con = shared_con.lock().unwrap();
-                        status::get_last(&*con).unwrap()
+                        status::get_last(&con).unwrap()
                     };
                     let typed_last_status = &TypedAction::Status(last_status.clone());
                     publish_status(
                         &last_status,
-                        &typed_last_status,
+                        typed_last_status,
                         &mut mqtt_client,
-                        &*topic_prefix,
+                        &topic_prefix,
                     );
                     println!("published current status on mqtt");
 
@@ -172,22 +172,22 @@ pub fn start_handler(
                                 Ok(msg) => match msg {
                                     TypedAction::Status(ref action) => {
                                         publish_status(
-                                            &action,
+                                            action,
                                             &msg,
                                             &mut mqtt_client,
-                                            &*topic_prefix,
+                                            &topic_prefix,
                                         );
                                     }
                                     TypedAction::Announcement(ref action) => {
                                         publish_announcement(
-                                            &action,
+                                            action,
                                             &msg,
                                             &mut mqtt_client,
-                                            &*topic_prefix,
+                                            &topic_prefix,
                                         );
                                     }
                                     TypedAction::Presence(ref action) => {
-                                        publish_presence(&action, &mut mqtt_client, &*topic_prefix);
+                                        publish_presence(action, &mut mqtt_client, &topic_prefix);
                                     }
                                 },
                                 Err(TryRecvError::Empty) => {
