@@ -71,7 +71,8 @@ fn create_tables(tx: &Transaction) {
                  user TEXT NOT NULL,
                  'from' INTEGER,
                  'to' INTEGER,
-                 public INTEGER
+                 public INTEGER,
+                 url TEXT
              )",
         params![],
     )

@@ -198,8 +198,8 @@ impl DbStored for AnnouncementAction {
                             let action_id = DbStoredTyped::store(&mut self.action, 1, tx).unwrap();
                             tx.execute(
                                 "INSERT INTO announcement_action \
-                                 (id, method, aid, user, \"from\", \"to\", public) VALUES \
-                                 (?, ?, ?, ?, ?, ?, ?)",
+                                 (id, method, aid, user, \"from\", \"to\", public, url) VALUES \
+                                 (?, ?, ?, ?, ?, ?, ?, ?)",
                                 params![
                                     &(action_id as i64),
                                     &0,
@@ -208,6 +208,7 @@ impl DbStored for AnnouncementAction {
                                     &self.from,
                                     &self.to,
                                     &(self.public as i64),
+                                    &self.url,
                                 ],
                             )
                             .unwrap();
@@ -234,9 +235,9 @@ impl DbStored for AnnouncementAction {
                                 Some(a) => a,
                             };
                             let action_id = DbStoredTyped::store(&mut self.action, 1, tx).unwrap();
-                            tx.execute("INSERT INTO announcement_action (id, method, aid, user, 'from', 'to', public) VALUES (?, ?, ?, ?, ?, ?, ?)",
+                            tx.execute("INSERT INTO announcement_action (id, method, aid, user, 'from', 'to', public, url) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
                                     params![&(action_id as i64), &1, &(aid as i64),
-                                      &self.user, &self.from, &self.to, &(self.public as i64)]).unwrap();
+                                      &self.user, &self.from, &self.to, &(self.public as i64), &self.url]).unwrap();
                             self.action.id = Some(action_id);
                             println!("Stored new action: {:?}", self);
                             if let Some(m) = mqtt {
@@ -262,9 +263,9 @@ impl DbStored for AnnouncementAction {
                             self.to = last_action.to;
                             self.public = last_action.public;
                             let action_id = DbStoredTyped::store(&mut self.action, 1, tx).unwrap();
-                            tx.execute("INSERT INTO announcement_action (id, method, aid, user, 'from', 'to', public) VALUES (?, ?, ?, ?, ?, ?, ?)",
+                            tx.execute("INSERT INTO announcement_action (id, method, aid, user, 'from', 'to', public, url) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
                                     params![&(action_id as i64), &2, &(aid as i64),
-                                      &self.user, &self.from, &self.to, &(self.public as i64)]).unwrap();
+                                      &self.user, &self.from, &self.to, &(self.public as i64), &self.url]).unwrap();
                             self.action.id = Some(action_id);
                             println!("Stored new action: {:?}", self);
                             if let Some(m) = mqtt {
@@ -326,6 +327,7 @@ pub mod announcements {
                 1 => true,
                 unexpected => panic!("unexpected value for public: {unexpected}"),
             },
+            url: row.get(11)?,
         })
     }
 

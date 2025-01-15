@@ -26,6 +26,7 @@ use sodiumoxide::crypto::pwhash;
 use sodiumoxide::crypto::pwhash::Salt;
 use spaceapi::Status as SpaceapiStatus;
 use time::OffsetDateTime;
+use url::Url;
 
 use crate::db;
 use crate::db::DbCon;
@@ -255,6 +256,7 @@ enum AnnouncementRequest {
         from: Time,
         to: Time,
         public: bool,
+        url: Option<Url>,
     },
     Mod {
         aid: u64,
@@ -263,6 +265,7 @@ enum AnnouncementRequest {
         from: Time,
         to: Time,
         public: bool,
+        url: Option<Url>,
     },
     Del {
         aid: u64,
@@ -453,6 +456,7 @@ impl DbStored for AnnouncementRequest {
                 to,
                 user,
                 public,
+                url,
             } => AnnouncementAction {
                 action: BaseAction {
                     id: None,
@@ -465,6 +469,7 @@ impl DbStored for AnnouncementRequest {
                 to: to.absolute(now),
                 user: user.clone(),
                 public: *public,
+                url: url.clone(),
             },
             Mod {
                 aid,
@@ -473,6 +478,7 @@ impl DbStored for AnnouncementRequest {
                 to,
                 user,
                 public,
+                url,
             } => AnnouncementAction {
                 action: BaseAction {
                     id: None,
@@ -485,6 +491,7 @@ impl DbStored for AnnouncementRequest {
                 to: to.absolute(now),
                 user: user.clone(),
                 public: *public,
+                url: url.clone(),
             },
             Del { aid, user } => AnnouncementAction {
                 // Most of the fields will just be ignored when stored.
@@ -499,6 +506,7 @@ impl DbStored for AnnouncementRequest {
                 to: 0,
                 user: user.clone(),
                 public: false,
+                url: None,
             },
         };
         action.store(transaction, mqtt)

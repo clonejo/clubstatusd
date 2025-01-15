@@ -51,15 +51,16 @@ The examples below omit the standard members.
 
 ```js
 {
-    "method": "new",      // "new" | "mod" | "del"
-    "aid": 42,            // the announcement to operate on. only needed when
-                          // "action=mod" or "action=del"
-    "user": "Hans Acker", // the user who announces to come (UTF-8,
-                          // 1 to 15 bytes, enclosing whitespace is stripped)
-    "from": 123456789,    // UNIX timestamp
-    "to": 123456789,      // UNIX timestamp
-    "public": true        // if the announcement can be seen without
-                          // authenticating
+    "method": "new",        // "new" | "mod" | "del"
+    "aid": 42,              // the announcement to operate on. only needed when
+                            // "action=mod" or "action=del"
+    "user": "Hans Acker",   // the user who announces to come (UTF-8,
+                            // 1 to 15 bytes, enclosing whitespace is stripped)
+    "from": 123456789,      // UNIX timestamp
+    "to": 123456789,        // UNIX timestamp
+    "public": true          // if the announcement can be seen without
+                            // authenticating
+    "url": "https://ccc.ac" // optional URL with further information
 }
 ```
 

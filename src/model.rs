@@ -4,6 +4,7 @@ use chrono::Utc;
 use rocket::request::FromParam;
 use rocket::serde::de::{self, Visitor};
 use rocket::serde::{Deserialize, Deserializer, Serialize};
+use url::Url;
 
 use crate::db::DbStored;
 
@@ -80,6 +81,7 @@ pub struct AnnouncementAction {
     pub from: i64,
     pub to: i64,
     pub public: bool,
+    pub url: Option<Url>,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]

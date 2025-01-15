@@ -21,10 +21,11 @@ regex = "1.1.0"
 rocket = "0.5.0"
 rocket-basicauth = "3.0.0"
 rumqttc = "0.20.0"
-rusqlite = "0.28.0"
+rusqlite = { version = "0.28.0", features = ["url"] }
 serde = "1.0.98"
 serde_json = "1.0.40"
 sodiumoxide = "0.2.0"
 spaceapi = "0.7.0"
 time = "0.3.14"
 uuid = { version = "1.1.2", features = ["v4", "v5"] }
+url = { version = "2.5.4", features = ["serde"] }

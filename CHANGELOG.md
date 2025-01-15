@@ -5,6 +5,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+### Changed
+- announcements now can take a `url` parameter. Since i have still not gotten
+  around to implementing automatic db migrations, please run:
+  ```sql
+  ALTER TABLE announcement_action ADD COLUMN url TEXT;
+  ```
 
 ## v0.4.2 - 2025-01-15
 ### Security
