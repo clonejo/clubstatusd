@@ -576,7 +576,7 @@ pub mod presence {
 
             // presence requests time out after 15min + time slept
             // set these users' status to left
-            for (_user, mut presence) in users.iter_mut() {
+            for (_user, presence) in users.iter_mut() {
                 // use values_mut() when stable
                 if presence.last_seen + 15 * 60 <= now {
                     presence.status = PresentUserStatus::Left;
@@ -605,7 +605,7 @@ pub mod presence {
             }
 
             // switch users with status=joined to present
-            for (_user, mut presence) in users.iter_mut() {
+            for (_user, presence) in users.iter_mut() {
                 // use values_mut() when stable
                 if presence.status == PresentUserStatus::Joined {
                     presence.status = PresentUserStatus::Present;

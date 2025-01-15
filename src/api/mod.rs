@@ -168,8 +168,7 @@ fn set_auth_cookie(cookie_jar: &CookieJar, cookie: &str) {
     let expire_time = OffsetDateTime::from_unix_timestamp(expire_time_chrono.timestamp()).unwrap();
     let cookie = Cookie::build(("clubstatusd-password", cookie.to_string()))
         .path("/")
-        .expires(Expiration::DateTime(expire_time))
-        .finish();
+        .expires(Expiration::DateTime(expire_time));
     cookie_jar.add(cookie);
 }
 
