@@ -138,7 +138,7 @@ impl<'r> FromRequest<'r> for Authenticated {
             return request::Outcome::Success(Authenticated {});
         } else {
             clear_auth_cookie(cookie_jar);
-            return request::Outcome::Failure((
+            return request::Outcome::Error((
                 http::Status::Unauthorized,
                 "Auth check failed. Please perform HTTP basic auth with the correct password.",
             ));
@@ -162,9 +162,11 @@ fn generate_cookie(cookie_salt: &Salt, password: &str) -> String {
 fn set_auth_cookie(cookie_jar: &CookieJar, cookie: &str) {
     // cookie expires in 1 to 2 years
     let expiration_year = Utc::now().year() + 2;
-    let expire_time_chrono = Utc.with_ymd_and_hms(expiration_year, 1, 1, 0, 0, 0).unwrap();
+    let expire_time_chrono = Utc
+        .with_ymd_and_hms(expiration_year, 1, 1, 0, 0, 0)
+        .unwrap();
     let expire_time = OffsetDateTime::from_unix_timestamp(expire_time_chrono.timestamp()).unwrap();
-    let cookie = Cookie::build("clubstatusd-password", cookie.to_string())
+    let cookie = Cookie::build(("clubstatusd-password", cookie.to_string()))
         .path("/")
         .expires(Expiration::DateTime(expire_time))
         .finish();
@@ -226,13 +228,13 @@ impl<'r> FromData<'r> for ActionRequest {
         // Read the data into a string.
         let string = match data.open(1024.bytes()).into_string().await {
             Ok(string) if string.is_complete() => string.into_inner(),
-            Ok(_) => return Failure((http::Status::PayloadTooLarge, TooLarge)),
-            Err(e) => return Failure((http::Status::InternalServerError, Io(e))),
+            Ok(_) => return Error((http::Status::PayloadTooLarge, TooLarge)),
+            Err(e) => return Error((http::Status::InternalServerError, Io(e))),
         };
 
         let request = match serde_json::from_str(string.as_str()) {
             Ok(j) => j,
-            Err(e) => return Failure((http::Status::UnprocessableEntity, JsonError(e))),
+            Err(e) => return Error((http::Status::UnprocessableEntity, JsonError(e))),
         };
 
         Success(request)
