@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   ```sql
   ALTER TABLE announcement_action ADD COLUMN url TEXT;
   ```
+- clap 3->4, API should have stayed the same
 
 ## v0.4.2 - 2025-01-15
 ### Security

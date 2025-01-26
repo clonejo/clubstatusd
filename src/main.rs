@@ -8,44 +8,38 @@ mod util;
 
 mod model_tests;
 
-use std::path::Path;
 use std::sync::{Arc, Mutex};
 
-use clap::{Arg, Command};
+use camino::Utf8PathBuf;
+use clap::Parser;
 use config::{Config, ConfigError};
 use sodiumoxide::crypto::pwhash;
 use sodiumoxide::crypto::pwhash::Salt;
 
+#[derive(Parser)]
+#[command()]
+/// Backend with HTTP API that keeps your hackerspace's status (open/closed, announcements, presence)
+struct Clubstatusd {
+    #[arg(short, long, default_value_t=Utf8PathBuf::from("/etc/clubstatusd"), help="set config file to use")]
+    config: Utf8PathBuf,
+}
+
 #[launch]
 async fn rocket() -> _ {
-    let arg_matches = Command::new("clubstatusd")
-        .author("clonejo <clonejo@shakik.de>")
-        .about(
-            "Backend with HTTP API that keeps your hackerspace's status (open/closed, \
-             announcements, presence)",
-        )
-        .arg(
-            Arg::new("CONFIG")
-                .short('c')
-                .long("config")
-                .takes_value(true)
-                .help("set config file to use"),
-        )
-        .get_matches();
+    let args = Clubstatusd::parse();
 
-    let config_path = Path::new(arg_matches.value_of("CONFIG").unwrap_or("/etc/clubstatusd"));
-    let conf_builder =
-        Config::builder().add_source(config::File::with_name(config_path.to_str().unwrap()));
+    let config_path = args.config;
+    let conf_builder = Config::builder().add_source(config::File::with_name(config_path.as_str()));
     let conf = match conf_builder.build() {
         Ok(conf) => conf,
         Err(err) => {
-            if arg_matches.is_present("CONFIG") || config_path.is_file() {
+            if config_path.is_file() {
                 eprintln!("Error reading config file: {}", err);
                 std::process::exit(1);
             }
             eprintln!(
                 "No config file found at {}, assuming default values.",
-                config_path.display()
+                config_path
             );
             Config::default()
         }
