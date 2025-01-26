@@ -26,7 +26,7 @@ pub(super) fn announcement_current(
             ev.starts(Utc.timestamp_opt(a.from, 0).unwrap());
             ev.ends(Utc.timestamp_opt(a.to, 0).unwrap());
             if let Some(url) = &a.url {
-                ev.url(&url.to_string());
+                ev.url(url.as_ref());
             }
             ev
         })
@@ -47,7 +47,7 @@ pub(super) fn announcement_current_public(shared_con: &State<Arc<Mutex<DbCon>>>)
             ev.starts(Utc.timestamp_opt(a.from, 0).unwrap());
             ev.ends(Utc.timestamp_opt(a.to, 0).unwrap());
             if let Some(url) = a.url {
-                ev.url(&url.to_string());
+                ev.url(url.as_ref());
             }
             ev
         })
