@@ -147,6 +147,7 @@ pub fn start_handler(
                                 ) => { /* do not log ping messages */ }
                                 _ => {
                                     println!("MQTT notification: {notification:?}");
+                                    std::thread::sleep(Duration::from_millis(100));
                                 }
                             }
                         }
