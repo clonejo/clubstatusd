@@ -5,6 +5,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+### Added
+- extracted types used in API into the `clubstatus-types` crate
+
 ### Changed
 - announcements now can take a `url` parameter. Since i have still not gotten
   around to implementing automatic db migrations, please run:

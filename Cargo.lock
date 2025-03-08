@@ -328,12 +328,23 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f46ad14479a25103f283c0f10005961cf086d8dc42205bb44c46ac563475dca6"
 
 [[package]]
+name = "clubstatus-types"
+version = "0.4.2"
+dependencies = [
+ "chrono",
+ "rusqlite",
+ "serde",
+ "url",
+]
+
+[[package]]
 name = "clubstatusd"
 version = "0.4.2"
 dependencies = [
  "camino",
  "chrono",
  "clap",
+ "clubstatus-types",
  "config",
  "cookie",
  "float-cmp",

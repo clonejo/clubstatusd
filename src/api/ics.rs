@@ -8,7 +8,8 @@ use rocket::response::{Responder, Response};
 use rocket::State;
 use uuid::Uuid;
 
-use super::{Authenticated, DbCon, ToPublic};
+use super::{Authenticated, DbCon};
+use clubstatus_types::public::ToPublic;
 
 #[get("/api/v0/announcement/current.ics")]
 pub(super) fn announcement_current(

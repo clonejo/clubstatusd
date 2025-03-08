@@ -4,7 +4,7 @@ use std::path::Path;
 use rusqlite::{params, Connection, Error, Transaction};
 
 use crate::db::DbStored;
-use crate::model::*;
+use clubstatus_types::{PresenceAction, Status, StatusAction, UserName};
 
 pub fn ensure_initialized(path: &Path) -> Result<(), Error> {
     if fs::metadata(path).is_err() {

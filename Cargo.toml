@@ -11,6 +11,8 @@ repository = "https://gitlab.aachen.ccc.de/clubstatus/clubstatusd"
 keywords = ["spaceapi"]
 
 [dependencies]
+#clubstatus-types = { version = "0.4.2", features = ["rusqlite"] }
+clubstatus-types = { path = "clubstatus-types", features = ["rusqlite"] }
 chrono = "0.4.0"
 clap = { version = "4.0", features = ["derive", "env"] }
 cookie = "0.18.1"

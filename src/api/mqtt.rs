@@ -8,7 +8,7 @@ use rumqttc::{Client, Event, Incoming, MqttOptions, Outgoing, QoS};
 use uuid::Uuid;
 
 use crate::db::{status, DbCon};
-use crate::model::*;
+use clubstatus_types::*;
 
 fn publish_status(
     action: &StatusAction,

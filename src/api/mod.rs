@@ -10,6 +10,7 @@ use std::sync::mpsc::SyncSender;
 use std::sync::{Arc, Mutex};
 
 use chrono::{Datelike, TimeZone, Utc};
+use clubstatus_types::public::{PublicAnnouncementAction, PublicStatusAction};
 use cookie::Expiration;
 use regex::Regex;
 use rocket::data::{self, Data, FromData, ToByteUnit};
@@ -31,12 +32,12 @@ use url::Url;
 use crate::db;
 use crate::db::DbCon;
 use crate::db::DbStored;
-use crate::model::Status;
-use crate::model::{
-    AnnouncementAction, AnnouncementMethod, BaseAction, QueryActionType, StatusAction, TypedAction,
-    UserName,
-};
+use crate::model::QueryActionType;
 use crate::util::bytes_to_hex;
+use clubstatus_types::{
+    public::ToPublic, AnnouncementAction, AnnouncementMethod, BaseAction, Status, StatusAction,
+    TypedAction, UserName,
+};
 
 mod ics;
 pub mod mqtt;
@@ -855,86 +856,6 @@ fn spaceapi_(
     status.state.lastchange = Some(changed_action.action.time.try_into().unwrap());
 
     RestResponder::new(http::Status::Ok, status)
-}
-
-#[derive(Debug, Serialize)]
-struct PublicBaseAction {
-    pub id: u64,
-    pub time: i64,
-    // no user
-    // no note (PublicAnnouncementAction has a note field instead)
-}
-#[derive(Debug, Serialize)]
-#[serde(rename_all = "lowercase")]
-enum PublicStatus {
-    Public,
-    Closed,
-}
-#[derive(Debug, Serialize)]
-struct PublicStatusAction {
-    #[serde(flatten)]
-    pub action: PublicBaseAction,
-    pub status: PublicStatus,
-}
-#[derive(Debug, Serialize)]
-struct PublicAnnouncementAction {
-    #[serde(flatten)]
-    pub action: PublicBaseAction,
-    pub method: AnnouncementMethod,
-    pub aid: u64, // announcement id
-    pub from: i64,
-    pub to: i64,
-
-    pub note: String,
-    pub url: Option<Url>,
-}
-
-trait ToPublic {
-    type Public;
-    fn to_public(&self) -> Self::Public;
-}
-impl ToPublic for Status {
-    type Public = PublicStatus;
-    fn to_public(&self) -> PublicStatus {
-        match self {
-            Status::Public => PublicStatus::Public,
-            Status::Private => PublicStatus::Closed,
-            Status::Closed => PublicStatus::Closed,
-        }
-    }
-}
-impl ToPublic for BaseAction {
-    type Public = PublicBaseAction;
-    fn to_public(&self) -> PublicBaseAction {
-        PublicBaseAction {
-            id: self.id.unwrap(),
-            time: self.time,
-        }
-    }
-}
-impl ToPublic for StatusAction {
-    type Public = PublicStatusAction;
-    fn to_public(&self) -> PublicStatusAction {
-        PublicStatusAction {
-            action: self.action.to_public(),
-            status: self.status.to_public(),
-        }
-    }
-}
-impl ToPublic for AnnouncementAction {
-    type Public = PublicAnnouncementAction;
-    fn to_public(&self) -> PublicAnnouncementAction {
-        assert!(self.public);
-        PublicAnnouncementAction {
-            action: self.action.to_public(),
-            method: self.method,
-            aid: self.aid.unwrap(),
-            from: self.from,
-            to: self.to,
-            note: self.action.note.clone(),
-            url: self.url.clone(),
-        }
-    }
 }
 
 /// Catches all OPTION requests in order to get the CORS related Fairing triggered.
