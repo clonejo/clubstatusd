@@ -145,6 +145,10 @@ pub fn start_handler(
                                     Event::Outgoing(Outgoing::PingReq)
                                     | Event::Incoming(Incoming::PingResp),
                                 ) => { /* do not log ping messages */ }
+                                Err(_) => {
+                                    println!("MQTT error: {notification:?}");
+                                    break;
+                                }
                                 _ => {
                                     println!("MQTT notification: {notification:?}");
                                     // sleep a bit to not overload syslog/journal:
