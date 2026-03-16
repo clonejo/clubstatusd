@@ -125,7 +125,7 @@ pub fn start_handler(
     port: u16,
     topic_prefix: String,
     shared_con: Arc<Mutex<DbCon>>,
-) -> Option<SyncSender<TypedAction>> {
+) -> Option<MqttSendQueue> {
     let (tx, rx) = sync_channel::<TypedAction>(10);
     match server {
         Some(server_str) => {
@@ -204,8 +204,18 @@ pub fn start_handler(
                     }
                 })
                 .unwrap();
-            Some(tx)
+            Some(MqttSendQueue(tx))
         }
         None => None,
+    }
+}
+
+#[derive(Debug, Clone)]
+pub(crate) struct MqttSendQueue(SyncSender<TypedAction>);
+impl MqttSendQueue {
+    pub(crate) fn try_send(&self, action: TypedAction) {
+        if let Err(err) = self.0.try_send(action) {
+            eprintln!("Error adding to mqtt send queue: {err}");
+        }
     }
 }

@@ -1,9 +1,9 @@
 use std::path::Path;
-use std::sync::mpsc::SyncSender;
 
 use rusqlite::types::ToSql;
 use rusqlite::{params, Connection, Error, Transaction};
 
+use crate::api::mqtt::MqttSendQueue;
 use crate::api::{IdExpr, PresenceRequest, RangeExpr, Take};
 use crate::model::QueryActionType;
 use clubstatus_types::{
@@ -24,7 +24,7 @@ pub fn connect(path_str: &str) -> Result<DbCon, Error> {
 }
 
 pub trait DbStored {
-    fn store(&mut self, con: &Transaction, mqtt: Option<&SyncSender<TypedAction>>) -> Option<u64>;
+    fn store(&mut self, con: &Transaction, mqtt: Option<&MqttSendQueue>) -> Option<u64>;
 }
 
 pub trait DbStoredTyped {
@@ -48,7 +48,7 @@ impl DbStoredTyped for BaseAction {
  */
 
 impl DbStored for StatusAction {
-    fn store(&mut self, tx: &Transaction, mqtt: Option<&SyncSender<TypedAction>>) -> Option<u64> {
+    fn store(&mut self, tx: &Transaction, mqtt: Option<&MqttSendQueue>) -> Option<u64> {
         match self.action.id {
             None => {
                 let (changed, public_changed) = match status::get_last(tx) {
@@ -84,7 +84,7 @@ impl DbStored for StatusAction {
                 self.action.id = Some(action_id);
                 println!("Stored new action: {:?}", self);
                 if let Some(m) = mqtt {
-                    m.send(TypedAction::Status(self.clone())).unwrap();
+                    m.try_send(TypedAction::Status(self.clone()));
                 }
                 Some(action_id)
             }
@@ -154,7 +154,7 @@ pub mod status {
  */
 
 impl DbStored for AnnouncementAction {
-    fn store(&mut self, tx: &Transaction, mqtt: Option<&SyncSender<TypedAction>>) -> Option<u64> {
+    fn store(&mut self, tx: &Transaction, mqtt: Option<&MqttSendQueue>) -> Option<u64> {
         match self.action.id {
             None => {
                 match self.method {
@@ -181,7 +181,7 @@ impl DbStored for AnnouncementAction {
                             self.aid = Some(action_id);
                             println!("Stored new action: {:?}", self);
                             if let Some(m) = mqtt {
-                                m.send(TypedAction::Announcement(self.clone())).unwrap();
+                                m.try_send(TypedAction::Announcement(self.clone()));
                             }
                             Some(action_id)
                         }
@@ -206,7 +206,7 @@ impl DbStored for AnnouncementAction {
                             self.action.id = Some(action_id);
                             println!("Stored new action: {:?}", self);
                             if let Some(m) = mqtt {
-                                m.send(TypedAction::Announcement(self.clone())).unwrap();
+                                m.try_send(TypedAction::Announcement(self.clone()));
                             }
                             Some(action_id)
                         }
@@ -234,7 +234,7 @@ impl DbStored for AnnouncementAction {
                             self.action.id = Some(action_id);
                             println!("Stored new action: {:?}", self);
                             if let Some(m) = mqtt {
-                                m.send(TypedAction::Announcement(self.clone())).unwrap();
+                                m.try_send(TypedAction::Announcement(self.clone()));
                             }
                             Some(action_id)
                         }
@@ -341,7 +341,7 @@ pub mod announcements {
  */
 
 impl DbStored for PresenceAction {
-    fn store(&mut self, tx: &Transaction, mqtt: Option<&SyncSender<TypedAction>>) -> Option<u64> {
+    fn store(&mut self, tx: &Transaction, mqtt: Option<&MqttSendQueue>) -> Option<u64> {
         if self.action.id.is_some() {
             return None;
         }
@@ -371,13 +371,15 @@ impl DbStored for PresenceAction {
         self.action.id = Some(action_id);
         println!("Stored new action: {:?}", self);
         if let Some(m) = mqtt {
-            m.send(TypedAction::Presence(self.clone())).unwrap();
+            m.try_send(TypedAction::Presence(self.clone()));
         }
         Some(action_id)
     }
 }
 
 pub mod presence {
+    use crate::api::mqtt::MqttSendQueue;
+
     use super::*;
     use chrono::Utc;
     use float_cmp::approx_eq;
@@ -453,7 +455,7 @@ pub mod presence {
 
     pub fn start_tracker(
         shared_con: Arc<Mutex<DbCon>>,
-        mqtt: Option<&SyncSender<TypedAction>>,
+        mqtt: Option<&MqttSendQueue>,
     ) -> SyncSender<PresenceRequest> {
         let (tx, rx) = sync_channel::<PresenceRequest>(10);
         let mqtt = mqtt.cloned();
@@ -466,7 +468,7 @@ pub mod presence {
 
     fn tracker(
         shared_con: Arc<Mutex<DbCon>>,
-        mqtt: Option<SyncSender<TypedAction>>,
+        mqtt: Option<MqttSendQueue>,
         rx: Receiver<PresenceRequest>,
     ) {
         #[derive(Debug)]

@@ -29,6 +29,7 @@ use spaceapi::Status as SpaceapiStatus;
 use time::OffsetDateTime;
 use url::Url;
 
+use crate::api::mqtt::MqttSendQueue;
 use crate::db;
 use crate::db::DbCon;
 use crate::db::DbStored;
@@ -47,7 +48,7 @@ pub fn run(
     listen: &str,
     password: Option<String>,
     cookie_salt: Salt,
-    mqtt: Option<SyncSender<TypedAction>>,
+    mqtt: Option<MqttSendQueue>,
     spaceapi_static: Option<SpaceapiStatus>,
 ) -> Rocket<Build> {
     let presence_tracker = db::presence::start_tracker(shared_con.clone(), mqtt.as_ref());
@@ -427,7 +428,7 @@ impl DbStored for StatusRequest {
     fn store(
         &mut self,
         transaction: &rusqlite::Transaction<'_>,
-        mqtt: Option<&SyncSender<TypedAction>>,
+        mqtt: Option<&MqttSendQueue>,
     ) -> Option<u64> {
         StatusAction {
             action: BaseAction {
@@ -445,7 +446,7 @@ impl DbStored for AnnouncementRequest {
     fn store(
         &mut self,
         transaction: &rusqlite::Transaction<'_>,
-        mqtt: Option<&SyncSender<TypedAction>>,
+        mqtt: Option<&MqttSendQueue>,
     ) -> Option<u64> {
         use AnnouncementRequest::*;
 
@@ -528,7 +529,7 @@ fn create_action(
     _authenticated: Authenticated,
     shared_con: &State<Arc<Mutex<DbCon>>>,
     presence_tracker: &State<SyncSender<PresenceRequest>>,
-    mqtt: &State<Option<SyncSender<TypedAction>>>,
+    mqtt: &State<Option<MqttSendQueue>>,
     action_request: Result<ActionRequest, ActionRequestError>,
 ) -> Result<RestResponder<CreateActionResponse>, JsonErrorResponder> {
     let action_request = match action_request {
