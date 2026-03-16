@@ -1,9 +1,9 @@
 ![Build status badge](https://img.shields.io/gitlab/pipeline/clubstatus/clubstatusd.svg?gitlab_url=https%3A%2F%2Fgitlab.aachen.ccc.de)
-![Maintenance status badge](https://img.shields.io/maintenance/yes/2025.svg)
+![Maintenance status badge](https://img.shields.io/maintenance/yes/2026.svg)
 
 # Description
 
-Implements a status API for hackerspaces. Most actions require authentication
+Implements a status API for hackspaces. Most actions require authentication
 (HTTP Auth with a common password). Also supports announcements (for events or
 people announcing their future stay) and presence (people currently staying).
 
