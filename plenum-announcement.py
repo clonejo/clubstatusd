@@ -14,8 +14,8 @@ THURSDAY = 3
 FRIDAY = 4
 
 
-def even_week_no(today):
-    return today.isocalendar()[1] % 2 == 0
+def odd_week_no(today):
+    return today.isocalendar()[1] % 2 == 1
 
 
 def next_thursday(today):
@@ -50,7 +50,7 @@ def create_status_announcement(date):
         "note": f"Plenum KW{week_date:>02}",
         "user": "plenumsbot",
         "public": False,
-        "url": "https://pads-intern.aachen.ccc.de/p/Plenum",
+        "url": "https://md.ccc.ac/Plenum",
     }
     res = requests.put(
         "https://status.aachen.ccc.de/api/v0",
@@ -66,13 +66,13 @@ def main():
     today = datetime.date.today()
     # 1 = Tuesday
     # 3 = Thursday
-    if today.weekday() in {1, 3} and even_week_no(today):
+    if today.weekday() in {1, 3} and odd_week_no(today):
         send_reminder_email(today)
 
-    if today.weekday() == THURSDAY and even_week_no(today):
+    if today.weekday() == THURSDAY and odd_week_no(today):
         # create announcement for next Plenum
-        next_plenum = today + datetime.timedelta(days=14)
-        while not even_week_no(next_plenum):
+        next_plenum = today + datetime.timedelta(days=7)
+        while not odd_week_no(next_plenum):
             # this is only relevant for years with 53 weeks
             next_plenum += datetime.timedelta(days=7)
         create_status_announcement(next_plenum)
