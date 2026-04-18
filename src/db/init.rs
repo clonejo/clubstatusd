@@ -1,7 +1,7 @@
 use std::fs;
 use std::path::Path;
 
-use rusqlite::{params, Connection, Error, Transaction};
+use rusqlite::{Connection, Error, Transaction, params};
 
 use crate::db::DbStored;
 use clubstatus_types::{PresenceAction, Status, StatusAction, UserName};

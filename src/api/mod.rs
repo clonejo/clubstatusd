@@ -1,4 +1,4 @@
-use std::cmp::{min, Ordering};
+use std::cmp::{Ordering, min};
 use std::convert::TryInto;
 use std::fmt;
 use std::io::Cursor;
@@ -36,8 +36,8 @@ use crate::db::DbStored;
 use crate::model::QueryActionType;
 use crate::util::bytes_to_hex;
 use clubstatus_types::{
-    public::ToPublic, AnnouncementAction, AnnouncementMethod, BaseAction, Status, StatusAction,
-    TypedAction, UserName,
+    AnnouncementAction, AnnouncementMethod, BaseAction, Status, StatusAction, TypedAction,
+    UserName, public::ToPublic,
 };
 
 mod ics;
@@ -124,12 +124,12 @@ impl<'r> FromRequest<'r> for Authenticated {
             }
             Some(s) => s,
         };
-        if let Some(cookie) = cookie_jar.get("clubstatusd-password") {
-            if cookie.value() == auth_secrets.cookie {
-                // set cookie again to extend lifetime
-                set_auth_cookie(cookie_jar, auth_secrets.cookie.as_str());
-                return request::Outcome::Success(Authenticated {});
-            }
+        if let Some(cookie) = cookie_jar.get("clubstatusd-password")
+            && cookie.value() == auth_secrets.cookie
+        {
+            // set cookie again to extend lifetime
+            set_auth_cookie(cookie_jar, auth_secrets.cookie.as_str());
+            return request::Outcome::Success(Authenticated {});
         }
         let auth = req.guard::<BasicAuth>().await;
         let basic_auth_password = match auth {
@@ -225,8 +225,8 @@ impl<'r> FromData<'r> for ActionRequest {
     type Error = ActionRequestError;
 
     async fn from_data(_req: &'r Request<'_>, data: Data<'r>) -> data::Outcome<'r, Self> {
-        use rocket::outcome::Outcome::*;
         use ActionRequestError::*;
+        use rocket::outcome::Outcome::*;
 
         // Read the data into a string.
         let string = match data.open(1024.bytes()).into_string().await {
@@ -542,7 +542,7 @@ fn create_action(
             return Ok(RestResponder::new(
                 http::Status::InternalServerError,
                 CreateActionResponse::Error,
-            ))
+            ));
         }
     };
     match action_request {

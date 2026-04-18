@@ -1,5 +1,5 @@
 use std::borrow::Cow;
-use std::sync::mpsc::{sync_channel, SyncSender, TryRecvError};
+use std::sync::mpsc::{SyncSender, TryRecvError, sync_channel};
 use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::Duration;
@@ -7,7 +7,7 @@ use std::time::Duration;
 use rumqttc::{Client, Event, Incoming, MqttOptions, Outgoing, QoS};
 use uuid::Uuid;
 
-use crate::db::{status, DbCon};
+use crate::db::{DbCon, status};
 use clubstatus_types::*;
 
 fn publish_status(

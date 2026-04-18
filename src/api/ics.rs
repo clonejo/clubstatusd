@@ -3,9 +3,9 @@ use std::sync::{Arc, Mutex};
 
 use chrono::{TimeZone, Utc};
 use icalendar::{Calendar, Component, Event, EventLike};
+use rocket::State;
 use rocket::http::{self, ContentType};
 use rocket::response::{Responder, Response};
-use rocket::State;
 use uuid::Uuid;
 
 use super::{Authenticated, DbCon};

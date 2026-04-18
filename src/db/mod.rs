@@ -1,7 +1,7 @@
 use std::path::Path;
 
 use rusqlite::types::ToSql;
-use rusqlite::{params, Connection, Error, Transaction};
+use rusqlite::{Connection, Error, Transaction, params};
 
 use crate::api::mqtt::MqttSendQueue;
 use crate::api::{IdExpr, PresenceRequest, RangeExpr, Take};
@@ -385,7 +385,7 @@ pub mod presence {
     use float_cmp::approx_eq;
     use rusqlite::Row;
     use std::collections::HashMap;
-    use std::sync::mpsc::{sync_channel, Receiver, SyncSender, TryRecvError};
+    use std::sync::mpsc::{Receiver, SyncSender, TryRecvError, sync_channel};
     use std::sync::{Arc, Mutex};
     use std::thread;
     use std::time::Duration;
