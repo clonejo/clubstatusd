@@ -31,7 +31,7 @@ impl FromSql for Status {
     }
 }
 impl ToSql for Status {
-    fn to_sql(&self) -> Result<ToSqlOutput, Error> {
+    fn to_sql(&self) -> Result<ToSqlOutput<'_>, Error> {
         let i = match self {
             Status::Public => 2,
             Status::Private => 1,
@@ -55,7 +55,7 @@ impl FromSql for AnnouncementMethod {
     }
 }
 impl ToSql for AnnouncementMethod {
-    fn to_sql(&self) -> Result<ToSqlOutput, Error> {
+    fn to_sql(&self) -> Result<ToSqlOutput<'_>, Error> {
         let i = match self {
             AnnouncementMethod::New => 0,
             AnnouncementMethod::Mod => 1,

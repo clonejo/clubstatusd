@@ -216,6 +216,7 @@ enum ActionRequest {
 #[derive(Debug)]
 enum ActionRequestError {
     TooLarge,
+    #[allow(unused)]
     Io(std::io::Error),
     JsonError(serde_json::Error),
 }
