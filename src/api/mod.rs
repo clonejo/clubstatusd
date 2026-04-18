@@ -854,8 +854,11 @@ fn spaceapi_(
     };
 
     let mut status = spaceapi_static.inner().clone();
-    status.state.open = Some(changed_action.status == Status::Public);
-    status.state.lastchange = Some(changed_action.action.time.try_into().unwrap());
+    status.state = Some(spaceapi::State {
+        open: Some(changed_action.status == Status::Public),
+        lastchange: Some(changed_action.action.time.try_into().unwrap()),
+        ..Default::default()
+    });
 
     RestResponder::new(http::Status::Ok, status)
 }

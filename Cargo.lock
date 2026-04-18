@@ -2147,9 +2147,9 @@ dependencies = [
 
 [[package]]
 name = "spaceapi"
-version = "0.7.0"
+version = "0.8.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f8ee53e9f5cf8b62a80d8616bc08c751027e026f7b5728f96f1708802c7caa73"
+checksum = "dfb00159c3cb731b45bba7ea1323b2eed08d77b851f50a8d79c6fe66bb09bce8"
 dependencies = [
  "log",
  "serde",
